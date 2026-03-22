@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "apple-a-day"
+version = "0.1.0"
+description = "Mac health toolkit — keeps the doctor away."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Eidos AGI", email = "daniel@eidosagi.com" },
+]
+keywords = ["macos", "diagnostics", "health", "monitoring", "apple-silicon"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: MacOS X",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: System :: Monitoring",
+]
+dependencies = [
+    "click>=8.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+mcp = ["mcp[cli]>=1.0"]
+dev = ["pytest", "ruff"]
+
+[project.scripts]
+aad = "apple_a_day.cli:main"
+
+[project.entry-points."mcp.servers"]
+apple-a-day = "apple_a_day.mcp_server:serve"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100

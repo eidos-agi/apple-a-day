@@ -1,0 +1,15 @@
+{
+  "id": "c07b9113-7534-4c76-b7f0-3fe646a26257",
+  "version": "0.1.0",
+  "projectName": "apple-a-day-landscape",
+  "created": "2026-03-22",
+  "phase": "research",
+  "transitions": [
+    {
+      "phase": "research",
+      "date": "2026-03-22"
+    }
+  ],
+  "question": "What existing open-source tools, native macOS utilities, and community patterns should apple-a-day integrate, wrap, or learn from to build the most comprehensive Mac health toolkit?",
+  "context": "apple-a-day is a new Mac-native health toolkit in the eidos-agi ecosystem (repo: eidos-agi/apple-a-day). It already has a working v0.1 CLI (`aad checkup`) with 7 check modules: crash loops, kernel panics, dylib health, memory pressure, disk health, launch agents, and homebrew.\n\nThe motivation came from a real incident: a broken Homebrew dependency (missing libboost_system.dylib) caused Facebook's watchman to crash-loop 611 times in a day via a KeepAlive launchd plist, likely triggering kernel panics (9 in 7 days) via watchdog timeouts. The user spent 20 minutes manually diagnosing what the tool should have caught automatically.\n\nThe project has 3 guardrails: Mac-only (no cross-platform), read-only by default (fixes require opt-in), and plain-english always-actionable output.\n\nThis research catalogs 25 open-source tools and native macOS utilities across 7 categories (system monitoring, native diagnostics, disk/storage, CPU/GPU/thermal, network, launchd/crash, security) to determine what apple-a-day should wrap, invoke, mine for patterns, or reimplement. The goal is to avoid reinventing wheels while building a unified interface.\n\nKey decision: should v1 prioritize crash/panic/launchd issues (the acute pain that triggered the project) or general \"is my Mac slow/overheating/out of disk\" complaints? Or both?\n\nTarget users: Eidos AGI developers first, Mac power users and sysadmins second, general Mac users third."
+}
