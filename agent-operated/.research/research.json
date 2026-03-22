@@ -1,0 +1,15 @@
+{
+  "id": "117c7991-5983-4dee-bc64-ba50f3021e11",
+  "version": "0.1.0",
+  "projectName": "agent-operated",
+  "created": "2026-03-22",
+  "phase": "research",
+  "transitions": [
+    {
+      "phase": "research",
+      "date": "2026-03-22"
+    }
+  ],
+  "question": "What does it mean to design software that AI agents operate rather than humans, and how should apple-a-day be designed for this paradigm?",
+  "context": "Eidos AGI builds software that AIs run, not humans. apple-a-day is a Mac health diagnostic library — its primary consumer will be an AI agent that imports it or shells out to it, gets structured findings, and decides what to do. The CLI exists for humans but is secondary.\n\nThis research explores: Is \"agent-operated software\" an established concept? What design patterns exist? What changes when the primary user is an AI? How do agent frameworks interact with system tools today? What are the failure modes and trust models?\n\nThe goal is to understand this paradigm deeply enough to make apple-a-day a reference implementation of agent-operated system health software."
+}
