@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
 from .checks import ALL_CHECKS
-from .models import CheckResult, Finding, Severity
+from .models import CheckError, CheckResult, ERR_TIMEOUT, ERR_UNKNOWN
 
 
 @dataclass
@@ -60,33 +60,39 @@ def run_all_checks(parallel: bool = True) -> CheckupReport:
     start = time.monotonic()
     mac_info = get_mac_info()
 
+    def _run_check(fn):
+        try:
+            return fn()
+        except TimeoutError:
+            return CheckResult(
+                name=fn.__name__,
+                errors=[CheckError(
+                    check=fn.__name__, error_code=ERR_TIMEOUT,
+                    message=f"Check timed out",
+                    suggestion="Try running with --no-parallel or check if a subprocess is hanging",
+                )],
+            )
+        except Exception as e:
+            return CheckResult(
+                name=fn.__name__,
+                errors=[CheckError(
+                    check=fn.__name__, error_code=ERR_UNKNOWN,
+                    message=str(e),
+                    suggestion="Run the check individually to see full output",
+                )],
+            )
+
     if parallel:
         results: list[CheckResult] = []
         with ThreadPoolExecutor(max_workers=len(ALL_CHECKS)) as pool:
-            futures = {pool.submit(fn): fn for fn in ALL_CHECKS}
+            futures = {pool.submit(_run_check, fn): fn for fn in ALL_CHECKS}
             for future in as_completed(futures):
-                fn = futures[future]
-                try:
-                    results.append(future.result(timeout=30))
-                except Exception:
-                    results.append(CheckResult(
-                        name=fn.__name__,
-                        findings=[Finding(
-                            check=fn.__name__,
-                            severity=Severity.INFO,
-                            summary=f"Check failed to complete",
-                        )],
-                    ))
+                results.append(future.result())
         # Preserve consistent ordering (same as ALL_CHECKS)
         order = {fn.__name__: i for i, fn in enumerate(ALL_CHECKS)}
         results.sort(key=lambda r: order.get(r.name, 999))
     else:
-        results = []
-        for check_fn in ALL_CHECKS:
-            try:
-                results.append(check_fn())
-            except Exception:
-                results.append(CheckResult(name=check_fn.__name__))
+        results = [_run_check(fn) for fn in ALL_CHECKS]
 
     duration_ms = int((time.monotonic() - start) * 1000)
 

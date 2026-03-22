@@ -1,7 +1,7 @@
 ---
 id: MS-0001
 title: 'v0.2: Agent-Native + Zero-Dep'
-status: open
+status: closed
 created: '2026-03-22'
 due: '2026-04-05'
 ---

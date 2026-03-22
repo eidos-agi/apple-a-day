@@ -37,6 +37,7 @@ def _cmd_checkup(args):
             "mac": report.mac_info,
             "duration_ms": report.duration_ms,
             "findings": [],
+            "errors": [],
         }
         for r in results:
             for f in r.findings:
@@ -51,6 +52,10 @@ def _cmd_checkup(args):
                     if args.fields:
                         finding = {k: v for k, v in finding.items() if k in args.fields}
                     output["findings"].append(finding)
+            for e in r.errors:
+                output["errors"].append(e.to_dict())
+        if not output["errors"]:
+            del output["errors"]
         print(json.dumps(output, indent=2))
         return
 
