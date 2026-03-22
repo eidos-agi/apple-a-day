@@ -1,47 +1,58 @@
 ---
-title: "apple-a-day: Mac Health Toolkit"
+title: "apple-a-day: Agent-Native Mac Health"
 type: "vision"
 date: "2026-03-22"
 ---
 
-**An apple a day keeps the doctor away.**
+**Your Mac's immune system, operated by your AI agent.**
 
-apple-a-day is a Mac-native health toolkit for developers and power users. It monitors, diagnoses, and fixes common macOS issues before they cascade into crashes, data loss, or wasted hours debugging.
+apple-a-day is an agent-native Mac health library. It detects crashes, diagnoses root causes, and enables autonomous remediation — designed to be called by AI agents, not just typed by humans.
 
 ## Why This Exists
 
-Macs have rich built-in diagnostic tools — `memory_pressure`, `powermetrics`, `sysctl`, `diskutil`, `otool`, DiagnosticReports, `launchctl` — but nobody uses them because they're scattered, low-level, and produce raw output. A crash-looping Homebrew service can cause kernel panics for days before anyone notices.
+Eidos AGI builds software that AIs run, not humans. An AI agent operating on a Mac needs to know if its host is healthy, why a service crashed, whether memory pressure is killing performance, and what to do about it. Today that requires 20 minutes of manual forensics across scattered macOS diagnostic tools. apple-a-day answers "what's wrong with this Mac?" in one call.
 
-apple-a-day wraps these native tools into a single checkup that speaks plain english.
+## Architecture: Library First
+
+apple-a-day is a **diagnostic library** with multiple thin surfaces:
+
+1. **Python import** (primary) — `from apple_a_day import checkup` — for agents running in-process
+2. **CLI** — `aad checkup --json` — for agents shelling out, `aad checkup` for humans demoing
+3. **MCP server** (optional) — for Claude Code / MCP-native agent frameworks
+
+The library doesn't care who's calling it or how. It returns structured `CheckResult` and `Finding` objects. The caller decides what to do.
+
+## Agent-Native Design Principles
+
+Following the established agent-native patterns (CLI-Anything/HKU, Poehnelt's agent CLI manifesto):
+
+1. **Structured output is the contract** — JSON by default for agents, rich tables opt-in for humans
+2. **Self-describing** — runtime schema introspection via `aad schema`, SKILL.md for agent discovery
+3. **The agent is not a trusted operator** — checks are read-only (safe), fixes require policy gates
+4. **Context window discipline** — `--fields` flag limits response size, findings are concise
+5. **No interactive input** — agents can't answer prompts, everything via flags/args
+6. **Multi-surface** — same logic via import, CLI, and MCP
+
+## The Agentic SRE Pattern
+
+apple-a-day implements the detect → diagnose → act loop from Agentic SRE, applied to a personal Mac:
+
+| Phase | What apple-a-day Does | Autonomy Level |
+|-------|----------------------|----------------|
+| **Detect** | Crash loops, kernel panics, memory pressure, disk health, broken dylibs, rogue services | Fully autonomous |
+| **Diagnose** | Decode panic strings, trace crash-loop causes, identify missing libraries, explain in plain english | Fully autonomous |
+| **Act** | Suggest fixes with commands; execute with policy gates and audit trail | Human-approved by default |
 
 ## Core Principles
 
-1. **Mac-native, Mac-specific** — no cross-platform abstraction. We use macOS APIs and tools directly.
-2. **Plain-english output** — don't just report "exit code -6", explain what it means and how to fix it.
-3. **Actionable** — every finding includes a fix command or next step.
-4. **Non-destructive** — read-only by default. Fixes require explicit opt-in.
-5. **MCP-native** — any Claude session can query Mac health as a tool.
+1. **Mac-native** — uses macOS-specific tools directly (otool, diskutil, launchctl, powermetrics). No cross-platform.
+2. **Zero runtime dependencies** — stdlib Python only. Agents run in lean environments.
+3. **Plain english, always actionable** — every finding has a severity, explanation, and fix.
+4. **Read-only by default** — checks never modify system state. Fixes require explicit opt-in.
+5. **Agent-first, human-friendly** — structured data for agents, pretty output for humans. Same library.
 
-## Surface Area
+## Target Consumers
 
-| Module | What It Watches |
-|--------|----------------|
-| Crash Loops | DiagnosticReports for processes dying repeatedly |
-| Kernel Panics | Panic logs decoded into human-readable causes |
-| Dylib Health | Broken dynamic library links after brew upgrades |
-| Memory Pressure | RAM pressure, swap usage, leak indicators |
-| Disk Health | APFS state, free space, Time Machine snapshot bloat |
-| Launch Agents | Rogue/crashed/forgotten launchd services |
-| Homebrew | Outdated packages, doctor warnings, orphans |
-
-## Interfaces
-
-- **CLI**: `aad` command — run `aad checkup` for a full report
-- **MCP Server**: Any Claude Code session can call health checks as tools
-- **JSON output**: `aad checkup --json` for programmatic consumption
-
-## Target Users
-
-- Eidos AGI developers (our own Macs first)
-- Mac power users and sysadmins
-- Anyone who's ever asked "why does my Mac keep crashing?"
+1. AI agents (Eidos, Claude Code, any agent framework) — primary
+2. Mac developers running `aad checkup` — secondary
+3. SRE/ops agents monitoring fleet Macs — future

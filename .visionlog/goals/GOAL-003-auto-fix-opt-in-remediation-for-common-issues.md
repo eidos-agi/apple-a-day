@@ -8,4 +8,4 @@ depends_on: []
 unlocks: []
 ---
 
-When a finding has a known fix (e.g. `brew reinstall watchman`, `launchctl bootout`), offer `aad fix` to apply it with confirmation. Non-destructive by default — always confirm before acting.
+Per ADR-001 and Agentic SRE research: implement the "act" phase of detect→diagnose→act. Fixes are policy-gated: human approval by default, agent can request override. Every fix logged with before/after state for audit. `--dry-run` required on all mutations. The agent is not a trusted operator.

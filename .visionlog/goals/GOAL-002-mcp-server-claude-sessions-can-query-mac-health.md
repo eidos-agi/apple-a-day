@@ -8,4 +8,4 @@ depends_on: []
 unlocks: []
 ---
 
-Expose health checks as MCP tools so any Claude Code session can call `mac_checkup`, `mac_crash_loops`, etc. This is the primary integration point for Eidos.
+Thin MCP wrapper over the diagnostic library (per ADR-001). Expose each check as an MCP tool: `mac_checkup`, `mac_crash_loops`, `mac_kernel_panics`, etc. Returns structured Finding objects. This is one of three surfaces (import, CLI, MCP), not the primary interface.
