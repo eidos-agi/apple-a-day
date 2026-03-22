@@ -1,5 +1,11 @@
 # apple-a-day
 
+[![PyPI](https://img.shields.io/pypi/v/apple-a-day)](https://pypi.org/project/apple-a-day/)
+[![Python 3.11+](https://img.shields.io/pypi/pyversions/apple-a-day)](https://pypi.org/project/apple-a-day/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![macOS](https://img.shields.io/badge/platform-macOS-lightgrey)](https://github.com/eidos-agi/apple-a-day)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)](https://pypi.org/project/apple-a-day/)
+
 **Agent-native Mac health toolkit — keeps the doctor away.**
 
 Zero dependencies. 9 checks. Plain english. Built for AI agents, friendly to humans.
@@ -28,6 +34,30 @@ aad checkup
 | **Network** | Wi-Fi signal quality, speed test, responsiveness |
 
 Every finding includes a severity, a plain-english explanation, and a fix command.
+
+## For AI Agents
+
+```python
+from apple_a_day.runner import run_all_checks
+
+report = run_all_checks()
+for r in report.results:
+    for f in r.findings:
+        if f.severity.value == "critical":
+            print(f.summary, "→", f.fix)
+```
+
+Or via CLI:
+
+```bash
+# Get structured JSON for agent parsing
+aad checkup --json --min-severity warning --fields severity,summary,fix
+
+# Discover capabilities at runtime
+aad schema
+```
+
+See [SKILL.md](SKILL.md) for the full agent-discoverable capability definition.
 
 ## Install
 
