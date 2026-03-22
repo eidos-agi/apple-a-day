@@ -1,0 +1,15 @@
+{
+  "id": "bad85d8e-be67-4e9e-bb3a-c25eb71bd311",
+  "version": "0.1.0",
+  "projectName": "foss-launch",
+  "created": "2026-03-22",
+  "phase": "research",
+  "transitions": [
+    {
+      "phase": "research",
+      "date": "2026-03-22"
+    }
+  ],
+  "question": "What specific strategies, scaffolding, and timeline should apple-a-day follow to become a top open-source Mac developer tool?",
+  "context": "apple-a-day is a new Mac-native health toolkit (eidos-agi/apple-a-day). It has a working v0.1 CLI with 7 check modules, MIT license, CONTRIBUTING.md, and GitHub issue templates. The goal is to make it a widely-adopted, well-regarded FOSS project — not just an internal tool.\n\nCompetitive landscape: No widely-adopted, pip-installable, Python-based Mac health diagnostic CLI exists. Stats (Swift GUI, 36k stars), Mac-CLI (8.8k stars), mas-cli, iSMC (Go), smctemp (C++) exist but none offer a one-command `aad checkup` experience with Rich-formatted output. The niche is genuinely open.\n\nThis research covers: what made similar Mac tools succeed, launch/promotion strategies, README patterns, trust signals for contributors, Python+macOS specific advice, and a phased timeline."
+}
