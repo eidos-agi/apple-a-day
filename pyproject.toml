@@ -24,12 +24,10 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Topic :: System :: Monitoring",
 ]
-dependencies = [
-    "click>=8.0",
-    "rich>=13.0",
-]
+dependencies = []
 
 [project.optional-dependencies]
+rich = ["rich>=13.0"]
 mcp = ["mcp[cli]>=1.0"]
 dev = ["pytest", "ruff"]
 
