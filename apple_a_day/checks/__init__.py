@@ -7,6 +7,8 @@ from .disk_health import check_disk_health
 from .memory_pressure import check_memory_pressure
 from .launch_agents import check_launch_agents
 from .homebrew import check_homebrew
+from .security import check_security
+from .network import check_network
 
 ALL_CHECKS = [
     check_crash_loops,
@@ -16,4 +18,6 @@ ALL_CHECKS = [
     check_disk_health,
     check_launch_agents,
     check_homebrew,
+    check_security,
+    check_network,
 ]
