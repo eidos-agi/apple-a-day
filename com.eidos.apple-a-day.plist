@@ -23,6 +23,6 @@
     <key>StandardErrorPath</key>
     <string>/dev/null</string>
     <key>RunAtLoad</key>
-    <false/>
+    <true/>
 </dict>
 </plist>

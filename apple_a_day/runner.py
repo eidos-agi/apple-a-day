@@ -98,7 +98,7 @@ def run_all_checks(parallel: bool = True) -> CheckupReport:
 
     report = CheckupReport(results=results, duration_ms=duration_ms, mac_info=mac_info)
 
-    # Auto-log every checkup
+    # Auto-log every checkup (trigger auto-detected: boot vs scheduled vs manual)
     try:
         from .log import log_checkup
         log_checkup(report)

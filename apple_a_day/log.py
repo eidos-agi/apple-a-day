@@ -24,7 +24,25 @@ def _rotate_if_needed():
         CURRENT_LOG.rename(rotated)
 
 
-def log_checkup(report) -> Path:
+def _detect_trigger() -> str:
+    """Detect what triggered this checkup: boot, daily, or manual."""
+    import subprocess
+    try:
+        out = subprocess.run(
+            ["sysctl", "-n", "kern.boottime"],
+            capture_output=True, text=True, timeout=5,
+        )
+        # kern.boottime format: "{ sec = 1711108800, usec = 0 } ..."
+        boot_sec = int(out.stdout.split("sec = ")[1].split(",")[0])
+        uptime_seconds = int(datetime.now().timestamp()) - boot_sec
+        if uptime_seconds < 300:  # less than 5 minutes since boot
+            return "boot"
+    except (subprocess.TimeoutExpired, OSError, ValueError, IndexError):
+        pass
+    return "scheduled"
+
+
+def log_checkup(report, trigger: str | None = None) -> Path:
     """Write a checkup result as one NDJSON line.
 
     Format per line:
@@ -114,6 +132,7 @@ def log_checkup(report) -> Path:
 
     entry = {
         "ts": datetime.now().isoformat(timespec="seconds"),
+        "trigger": trigger or _detect_trigger(),
         "duration_ms": report.duration_ms,
         "mac": report.mac_info,
         "score": overall,
