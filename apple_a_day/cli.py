@@ -68,6 +68,49 @@ def _cmd_schema(_args):
     print(json.dumps(get_schema(), indent=2))
 
 
+def _cmd_profile(args):
+    """Show or refresh Mac user profile."""
+    from .profile import get_or_create_profile
+
+    profile = get_or_create_profile(force_refresh=args.refresh)
+
+    if args.profile_json:
+        print(json.dumps(profile, indent=2))
+        return
+
+    # Pretty print
+    hw = profile.get("hardware", {})
+    print(f"\napple-a-day user profile")
+    print(f"  {hw.get('cpu', '?')} | {hw.get('memory_gb', '?')} GB RAM"
+          f" | {hw.get('disk_gb', '?')} GB disk | macOS {hw.get('os_version', '?')}")
+    print(f"\n  User type: {profile.get('user_type', 'unknown')}")
+    print(f"  Tags: {', '.join(profile.get('tags', []))}")
+
+    tools = profile.get("dev_tools", {})
+    if tools:
+        print(f"\n  Dev tools ({len(tools)}):")
+        for name, ver in sorted(tools.items()):
+            print(f"    {name}: {ver[:60]}")
+
+    editors = profile.get("editors", [])
+    if editors:
+        print(f"\n  Editors: {', '.join(editors)}")
+
+    ws = profile.get("workspace", {})
+    if ws.get("repo_count"):
+        print(f"\n  Repos: {ws['repo_count']} across {len(ws.get('repo_dirs', []))} directories")
+        langs = ws.get("languages", {})
+        if langs:
+            print(f"  Languages: {', '.join(f'{k} ({v})' for k, v in langs.items())}")
+
+    top = profile.get("top_commands", [])[:10]
+    if top:
+        print(f"\n  Top commands: {', '.join(c['command'] for c in top)}")
+
+    print(f"\n  Profiled: {profile.get('gathered_at', '?')[:19]}")
+    print(f"  Stored: ~/.config/eidos/mac-profile.json")
+
+
 def main(argv=None):
     """apple-a-day: Mac health toolkit — keeps the doctor away."""
     parser = argparse.ArgumentParser(
@@ -92,6 +135,11 @@ def main(argv=None):
     # schema
     sub.add_parser("schema", help="Show JSON schema of all checks and output format")
 
+    # profile
+    p_profile = sub.add_parser("profile", help="Show or refresh Mac user profile")
+    p_profile.add_argument("--refresh", action="store_true", help="Force re-gather profile data")
+    p_profile.add_argument("--json", action="store_true", dest="profile_json", help="Output as JSON")
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -107,3 +155,5 @@ def main(argv=None):
         _cmd_checkup(args)
     elif args.command == "schema":
         _cmd_schema(args)
+    elif args.command == "profile":
+        _cmd_profile(args)
