@@ -68,6 +68,61 @@ def _cmd_schema(_args):
     print(json.dumps(get_schema(), indent=2))
 
 
+def _cmd_log(args):
+    """Show recent checkup log entries."""
+    from .log import read_recent
+
+    entries = read_recent(args.n)
+    if not entries:
+        print("No log entries yet. Run `aad checkup` first.")
+        return
+
+    if args.log_json:
+        print(json.dumps(entries, indent=2))
+        return
+
+    for e in entries:
+        ts = e.get("ts", "?")[:19]
+        c = e.get("counts", {})
+        crits = c.get("critical", 0)
+        warns = c.get("warning", 0)
+        ms = e.get("duration_ms", 0)
+
+        status = "\033[32mhealthy\033[0m"
+        if crits > 0:
+            status = f"\033[31m{crits} critical\033[0m"
+        elif warns > 0:
+            status = f"\033[33m{warns} warning\033[0m"
+
+        print(f"  {ts}  {status}  ({ms}ms)")
+        for crit in e.get("criticals", [])[:3]:
+            print(f"    \033[31m✗\033[0m {crit[:70]}")
+
+
+def _cmd_trend(args):
+    """Show health trend from logs."""
+    from .log import trend_summary
+
+    trend = trend_summary()
+    if not trend:
+        print("Not enough log entries for trends. Run `aad checkup` a few times first.")
+        return
+
+    if args.trend_json:
+        print(json.dumps(trend, indent=2))
+        return
+
+    direction = "\033[32m↑ improving\033[0m" if trend["improving"] else "\033[31m↓ degrading\033[0m"
+    print(f"\napple-a-day health trend ({trend['entries']} checkups, {trend['first']} → {trend['last']})")
+    print(f"  Direction: {direction}")
+    print(f"  Avg criticals: {trend['avg_criticals']}  |  Avg warnings: {trend['avg_warnings']}")
+
+    if trend["recurring"]:
+        print(f"\n  Recurring issues:")
+        for issue in trend["recurring"]:
+            print(f"    \033[31m●\033[0m {issue}")
+
+
 def _cmd_profile(args):
     """Show or refresh Mac user profile."""
     from .profile import get_or_create_profile
@@ -140,6 +195,15 @@ def main(argv=None):
     p_profile.add_argument("--refresh", action="store_true", help="Force re-gather profile data")
     p_profile.add_argument("--json", action="store_true", dest="profile_json", help="Output as JSON")
 
+    # log
+    p_log = sub.add_parser("log", help="Show recent checkup log entries")
+    p_log.add_argument("-n", type=int, default=5, help="Number of entries (default: 5)")
+    p_log.add_argument("--json", action="store_true", dest="log_json", help="Output as JSON")
+
+    # trend
+    p_trend = sub.add_parser("trend", help="Show health trend from logs")
+    p_trend.add_argument("--json", action="store_true", dest="trend_json", help="Output as JSON")
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -157,3 +221,7 @@ def main(argv=None):
         _cmd_schema(args)
     elif args.command == "profile":
         _cmd_profile(args)
+    elif args.command == "log":
+        _cmd_log(args)
+    elif args.command == "trend":
+        _cmd_trend(args)

@@ -96,4 +96,13 @@ def run_all_checks(parallel: bool = True) -> CheckupReport:
 
     duration_ms = int((time.monotonic() - start) * 1000)
 
-    return CheckupReport(results=results, duration_ms=duration_ms, mac_info=mac_info)
+    report = CheckupReport(results=results, duration_ms=duration_ms, mac_info=mac_info)
+
+    # Auto-log every checkup
+    try:
+        from .log import log_checkup
+        log_checkup(report)
+    except Exception:
+        pass  # logging should never break the checkup
+
+    return report
