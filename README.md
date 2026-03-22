@@ -87,6 +87,14 @@ JSON output (for scripts or piping):
 aad checkup --json
 ```
 
+## Why "apple-a-day"?
+
+> *"Eat an apple on going to bed, and you'll keep the doctor from earning his bread."*
+>
+> — Welsh proverb, Pembrokeshire, 1866
+
+Prevention over treatment. Don't wait until your Mac is crashing — run the check daily and you won't need the doctor at all. The tool runs silently every morning, scoring your Mac's health across 7 dimensions. By the time you ask "why is my Mac slow?", the log already has the answer.
+
 ## Origin story
 
 This tool was born from a real incident: a broken Homebrew dependency (`libboost_system.dylib`) caused Facebook's `watchman` to crash-loop **611 times in a single day** via a `KeepAlive` launchd plist. The crash loop likely triggered **9 kernel panics in 7 days** through watchdog timeouts. It took 20 minutes of manual forensics to figure out what happened.
