@@ -236,7 +236,7 @@ def main(argv=None):
     """apple-a-day: Mac health toolkit — keeps the doctor away."""
     parser = argparse.ArgumentParser(
         prog="aad",
-        description="apple-a-day: Mac health toolkit — keeps the doctor away.",
+        description="aad (apple-a-day): Mac health toolkit — keeps the doctor away. https://github.com/eidos-agi/apple-a-day",
     )
     parser.add_argument("--version", action="version", version=f"apple-a-day {__version__}")
 
