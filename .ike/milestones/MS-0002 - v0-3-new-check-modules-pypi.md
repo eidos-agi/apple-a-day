@@ -1,7 +1,7 @@
 ---
 id: MS-0002
 title: 'v0.3: New Check Modules + PyPI'
-status: open
+status: closed
 created: '2026-03-22'
 due: '2026-04-19'
 ---
