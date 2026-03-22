@@ -292,7 +292,7 @@ def get_or_create_profile(force_refresh: bool = False) -> dict:
             gathered = existing.get("gathered_at", "")
             try:
                 age_days = (datetime.now() - datetime.fromisoformat(gathered)).days
-                if age_days < 7:
+                if age_days < 90:
                     return existing
             except (ValueError, TypeError):
                 pass
