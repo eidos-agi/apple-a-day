@@ -3,12 +3,14 @@
 import plistlib
 import subprocess
 
+from ..context import get_context, disk_context
 from ..models import CheckResult, Finding, Severity
 
 
 def check_disk_health() -> CheckResult:
     """Check APFS container health, free space, and Time Machine snapshot bloat."""
     result = CheckResult(name="Disk Health")
+    ctx = get_context()
 
     # Free space check — use diskutil for real APFS container usage (df lies)
     try:
@@ -57,14 +59,21 @@ def check_disk_health() -> CheckResult:
 
             fix = ""
             if sev != Severity.OK:
-                fix = ("Run `sudo tmutil thinlocalsnapshots / 9999999999 1`"
-                       " to reclaim Time Machine snapshot space."
-                       " Also check ~/Library/Caches and Docker images.")
+                fix = "Run `sudo tmutil thinlocalsnapshots / 9999999999 1` to reclaim snapshot space."
+                extra = disk_context(free_gb, used_pct, ctx)
+                if extra:
+                    fix += f" {extra}"
+
+            details = ""
+            if sev != Severity.OK and ctx.get("is_developer"):
+                details = (f"Developers with heavy workloads should keep 50+ GB free "
+                           f"to avoid swap pressure and slow builds.")
 
             result.findings.append(Finding(
                 check="disk_health",
                 severity=sev,
                 summary=f"Boot disk {used_pct}% full — {free_gb} GB free",
+                details=details,
                 fix=fix,
             ))
     except (subprocess.TimeoutExpired, OSError, ValueError):

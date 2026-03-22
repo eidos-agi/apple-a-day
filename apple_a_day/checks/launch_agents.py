@@ -4,6 +4,7 @@ import plistlib
 import subprocess
 from pathlib import Path
 
+from ..context import get_context, crash_loop_fix
 from ..models import CheckResult, Finding, Severity
 
 AGENT_DIRS = [
@@ -16,6 +17,7 @@ AGENT_DIRS = [
 def check_launch_agents() -> CheckResult:
     """Find launchd services that are crashing, unknown, or misconfigured."""
     result = CheckResult(name="Launch Agents")
+    ctx = get_context()
 
     # Get list of services and their status
     try:
@@ -71,8 +73,7 @@ def check_launch_agents() -> CheckResult:
                 severity=Severity.CRITICAL,
                 summary=f"{label}: crash-looping (KeepAlive + exit code {status})",
                 details=f"Plist: {plist_file}",
-                fix=f"Stop with: `launchctl bootout gui/$(id -u) {plist_file}`\n"
-                    f"Or fix the underlying issue and restart.",
+                fix=crash_loop_fix(label, str(plist_file), ctx),
             ))
 
     # Report other crashed services (non-KeepAlive, less severe)
