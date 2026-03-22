@@ -68,6 +68,72 @@ def _cmd_schema(_args):
     print(json.dumps(get_schema(), indent=2))
 
 
+def _cmd_score(args):
+    """Show health score matrix from latest checkup."""
+    from .log import read_recent
+
+    entries = read_recent(1)
+    if not entries:
+        print("No scores yet. Run `aad checkup` first.")
+        return
+
+    latest = entries[-1]
+
+    if args.score_json:
+        print(json.dumps({
+            "ts": latest.get("ts"),
+            "score": latest.get("score"),
+            "grade": latest.get("grade"),
+            "matrix": latest.get("matrix", {}),
+        }, indent=2))
+        return
+
+    score = latest.get("score", 0)
+    grade = latest.get("grade", "?")
+    matrix = latest.get("matrix", {})
+    ts = latest.get("ts", "?")[:19]
+
+    # Color the grade
+    grade_colors = {"A": "\033[32m", "B": "\033[32m", "C": "\033[33m", "D": "\033[31m", "F": "\033[31m"}
+    gc = grade_colors.get(grade, "")
+
+    print(f"\napple-a-day health score  {gc}{grade} ({score}/100)\033[0m  {ts}")
+    print()
+
+    # Matrix as visual bars
+    dim_labels = {
+        "stability": "Stability  ",
+        "memory": "Memory     ",
+        "storage": "Storage    ",
+        "services": "Services   ",
+        "security": "Security   ",
+        "infra": "Infra      ",
+        "network": "Network    ",
+    }
+
+    for dim, label in dim_labels.items():
+        val = matrix.get(dim, 100)
+        bar_len = val // 5  # 0-20 chars
+        if val >= 80:
+            color = "\033[32m"
+        elif val >= 50:
+            color = "\033[33m"
+        else:
+            color = "\033[31m"
+
+        bar = "█" * bar_len + "░" * (20 - bar_len)
+        print(f"  {label} {color}{bar}\033[0m {val}")
+
+    print()
+
+    # Criticals summary
+    crits = latest.get("criticals", [])
+    if crits:
+        print(f"  \033[31m{len(crits)} critical issue(s):\033[0m")
+        for c in crits[:5]:
+            print(f"    ✗ {c[:70]}")
+
+
 def _cmd_log(args):
     """Show recent checkup log entries."""
     from .log import read_recent
@@ -195,6 +261,10 @@ def main(argv=None):
     p_profile.add_argument("--refresh", action="store_true", help="Force re-gather profile data")
     p_profile.add_argument("--json", action="store_true", dest="profile_json", help="Output as JSON")
 
+    # score
+    p_score = sub.add_parser("score", help="Show health score matrix from latest checkup")
+    p_score.add_argument("--json", action="store_true", dest="score_json", help="Output as JSON")
+
     # log
     p_log = sub.add_parser("log", help="Show recent checkup log entries")
     p_log.add_argument("-n", type=int, default=5, help="Number of entries (default: 5)")
@@ -221,6 +291,8 @@ def main(argv=None):
         _cmd_schema(args)
     elif args.command == "profile":
         _cmd_profile(args)
+    elif args.command == "score":
+        _cmd_score(args)
     elif args.command == "log":
         _cmd_log(args)
     elif args.command == "trend":
