@@ -1,14 +1,17 @@
 # apple-a-day
 
-**Mac health toolkit — keeps the doctor away.**
+**Agent-native Mac health toolkit — keeps the doctor away.**
 
-A single command that checks your Mac for crashes, broken services, memory pressure, disk issues, and more — then tells you what's wrong in plain english with a fix for every finding.
+Zero dependencies. 9 checks. Plain english. Built for AI agents, friendly to humans.
 
 ```
-$ aad checkup
+pip install apple-a-day
+aad checkup
 ```
 
-![apple-a-day screenshot](https://github.com/eidos-agi/apple-a-day/raw/main/docs/screenshot.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/eidos-agi/apple-a-day/main/demo/demo.gif" alt="apple-a-day demo" width="700">
+</p>
 
 ## What it checks
 
@@ -21,6 +24,8 @@ $ aad checkup
 | **Disk Health** | APFS state, free space, Time Machine snapshot bloat |
 | **Launch Agents** | Crash-looping, rogue, or forgotten launchd services |
 | **Homebrew** | Outdated packages, doctor warnings, broken links |
+| **Security** | SIP, Gatekeeper, FileVault, XProtect freshness |
+| **Network** | Wi-Fi signal quality, speed test, responsiveness |
 
 Every finding includes a severity, a plain-english explanation, and a fix command.
 

@@ -1,0 +1,113 @@
+
+apple-a-day checkup
+macOS 15.3.1 | Apple M4 Max | 36 GB RAM
+
+                                Memory Pressure                                 
+┌────┬────────────────────────────────────┬────────────────────────────────────┐
+│⚠   │ Swap usage: 30767.00MM             │ High swap causes SSD wear and      │
+│    │   vm.swapusage: total = 31744.00M  │ slowdowns.                         │
+│    │ used = 30767.00M  free = 977.00M   │                                    │
+│    │ (encrypted)                        │                                    │
+└────┴────────────────────────────────────┴────────────────────────────────────┘
+
+                                 Kernel Panics                                  
+┌────┬────────────────────────────────────┬────────────────────────────────────┐
+│✗   │ Kernel panic on 2026-03-22         │ Full report:                       │
+│    │ 00:47:51.48 -0500                  │ /Library/Logs/DiagnosticReports/pa…│
+│    │   System froze — a core process    │                                    │
+│    │ couldn't check in. Usually caused  │                                    │
+│    │ by a hung driver or runaway        │                                    │
+│    │ service.                           │                                    │
+│✗   │ Kernel panic on 2026-03-21         │ Full report:                       │
+│    │ 16:18:00.67 -0500                  │ /Library/Logs/DiagnosticReports/pa…│
+│    │   System froze — a core process    │                                    │
+│    │ couldn't check in. Usually caused  │                                    │
+│    │ by a hung driver or runaway        │                                    │
+│    │ service.                           │                                    │
+│✗   │ Kernel panic on 2026-03-21         │ Full report:                       │
+│    │ 13:04:44.34 -0500                  │ /Library/Logs/DiagnosticReports/pa…│
+│    │   Low-level boot firmware panic —  │                                    │
+│    │ often a failed hibernate resume.   │                                    │
+│✗   │ Kernel panic on 2026-03-20         │ Full report:                       │
+│    │ 23:34:07.70 -0500                  │ /Library/Logs/DiagnosticReports/pa…│
+│    │   Unknown panic type — review the  │                                    │
+│    │ full report.                       │                                    │
+│✗   │ Kernel panic on 2026-03-20         │ Full report:                       │
+│    │ 17:17:33.93 -0500                  │ /Library/Logs/DiagnosticReports/pa…│
+│    │   System froze — a core process    │                                    │
+│    │ couldn't check in. Usually caused  │                                    │
+│    │ by a hung driver or runaway        │                                    │
+│    │ service.                           │                                    │
+│✗   │ Kernel panic on 2026-03-20         │ Full report:                       │
+│    │ 13:45:42.14 -0500                  │ /Library/Logs/DiagnosticReports/pa…│
+│    │   System froze — a core process    │                                    │
+│    │ couldn't check in. Usually caused  │                                    │
+│    │ by a hung driver or runaway        │                                    │
+│    │ service.                           │                                    │
+│✗   │ Kernel panic on 2026-03-20         │ Full report:                       │
+│    │ 08:48:11.87 -0500                  │ /Library/Logs/DiagnosticReports/pa…│
+│    │   Unknown panic type — review the  │                                    │
+│    │ full report.                       │                                    │
+│✗   │ Kernel panic on 2026-03-20         │ Full report:                       │
+│    │ 04:53:58.93 -0500                  │ /Library/Logs/DiagnosticReports/pa…│
+│    │   System froze — a core process    │                                    │
+│    │ couldn't check in. Usually caused  │                                    │
+│    │ by a hung driver or runaway        │                                    │
+│    │ service.                           │                                    │
+│✗   │ Kernel panic on 2026-03-17         │ Full report:                       │
+│    │ 10:55:36.15 -0500                  │ /Library/Logs/DiagnosticReports/pa…│
+│    │   System froze — a core process    │                                    │
+│    │ couldn't check in. Usually caused  │                                    │
+│    │ by a hung driver or runaway        │                                    │
+│    │ service.                           │                                    │
+│✗   │ Kernel panic on 2026-03-15         │ Full report:                       │
+│    │ 09:27:39.61 -0500                  │ /Library/Logs/DiagnosticReports/pa…│
+│    │   System froze — a core process    │                                    │
+│    │ couldn't check in. Usually caused  │                                    │
+│    │ by a hung driver or runaway        │                                    │
+│    │ service.                           │                                    │
+└────┴────────────────────────────────────┴────────────────────────────────────┘
+
+                                  Crash Loops                                   
+┌────┬────────────────────────────────────┬────────────────────────────────────┐
+│✗   │ watchman crashed 182 times in the  │ Check: `log show --predicate       │
+│    │ last 24h                           │ 'process == "watchman"' --last 24h`│
+│    │   Crash reports found in           │ or reinstall the service.          │
+│    │ DiagnosticReports directories.     │                                    │
+└────┴────────────────────────────────────┴────────────────────────────────────┘
+
+                                 Launch Agents                                  
+┌────┬────────────────────────────────────┬────────────────────────────────────┐
+│✗   │ com.github.facebook.watchman:      │ Stop with: `launchctl bootout      │
+│    │ crash-looping (KeepAlive + exit    │ gui/$(id -u)                       │
+│    │ code -6)                           │ /Users/dshanklinbv/Library/LaunchA…│
+│    │   Plist:                           │ Or fix the underlying issue and    │
+│    │ /Users/dshanklinbv/Library/Launch… │ restart.                           │
+│✗   │ com.tosh.daemon: crash-looping     │ Stop with: `launchctl bootout      │
+│    │ (KeepAlive + exit code 2)          │ gui/$(id -u)                       │
+│    │   Plist:                           │ /Users/dshanklinbv/Library/LaunchA…│
+│    │ /Users/dshanklinbv/Library/Launch… │ Or fix the underlying issue and    │
+│    │                                    │ restart.                           │
+│✗   │ com.reeves.finance: crash-looping  │ Stop with: `launchctl bootout      │
+│    │ (KeepAlive + exit code 1)          │ gui/$(id -u)                       │
+│    │   Plist:                           │ /Users/dshanklinbv/Library/LaunchA…│
+│    │ /Users/dshanklinbv/Library/Launch… │ Or fix the underlying issue and    │
+│    │                                    │ restart.                           │
+└────┴────────────────────────────────────┴────────────────────────────────────┘
+
+                                    Homebrew                                    
+┌────┬────────────────────────────────────┬────────────────────────────────────┐
+│⚠   │ A newer Command Line Tools release │ Run `brew doctor` for full details.│
+│    │ is available.                      │                                    │
+│⚠   │ Some installed formulae are        │ Run `brew doctor` for full details.│
+│    │ deprecated or disabled.            │                                    │
+│⚠   │ You have the following deprecated, │ Run `brew doctor` for full details.│
+│    │ official taps tapped:              │                                    │
+│⚠   │ You have unlinked kegs in your     │ Run `brew doctor` for full details.│
+│    │ Cellar.                            │                                    │
+│⚠   │ Your Xcode (16.2) is outdated.     │ Run `brew doctor` for full details.│
+│⚠   │ 140 outdated packages (136         │ Run `brew upgrade` to update.      │
+│    │ formulae, 4 casks)                 │                                    │
+└────┴────────────────────────────────────┴────────────────────────────────────┘
+
+14 critical | 7 warning(s)  (34391ms)
