@@ -10,34 +10,63 @@ def check_disk_health() -> CheckResult:
     """Check APFS container health, free space, and Time Machine snapshot bloat."""
     result = CheckResult(name="Disk Health")
 
-    # Free space check
+    # Free space check — use diskutil for real APFS container usage (df lies)
     try:
         out = subprocess.run(
-            ["df", "-H", "/"],
-            capture_output=True, text=True, timeout=5,
+            ["diskutil", "info", "/"],
+            capture_output=True, text=True, timeout=10,
         )
-        lines = out.stdout.strip().split("\n")
-        if len(lines) >= 2:
-            parts = lines[1].split()
-            # parts: [filesystem, size, used, avail, capacity%, mount]
-            if len(parts) >= 5:
-                capacity = int(parts[4].rstrip("%"))
-                avail = parts[3]
+        info_lines = {}
+        for line in out.stdout.strip().split("\n"):
+            if ":" in line:
+                key, _, val = line.partition(":")
+                info_lines[key.strip()] = val.strip()
 
-                if capacity >= 95:
-                    sev = Severity.CRITICAL
-                elif capacity >= 85:
-                    sev = Severity.WARNING
-                else:
-                    sev = Severity.OK
+        disk_size_str = info_lines.get("Disk Size", "")
+        free_str = info_lines.get("Container Free Space", "")
 
-                result.findings.append(Finding(
-                    check="disk_health",
-                    severity=sev,
-                    summary=f"Boot disk {capacity}% full — {avail} free",
-                    fix="Run `sudo tmutil thinlocalsnapshots / 9999999999 1`"
-                        " to reclaim Time Machine snapshot space." if sev != Severity.OK else "",
-                ))
+        disk_bytes = None
+        free_bytes = None
+
+        # Parse "994.7 GB (994662584320 Bytes)"
+        for label, raw in [("disk", disk_size_str), ("free", free_str)]:
+            if "Bytes" in raw:
+                try:
+                    b = int(raw.split("(")[1].split(" Bytes")[0])
+                    if label == "disk":
+                        disk_bytes = b
+                    else:
+                        free_bytes = b
+                except (IndexError, ValueError):
+                    pass
+
+        if disk_bytes and free_bytes:
+            used_pct = round((1 - free_bytes / disk_bytes) * 100)
+            free_gb = round(free_bytes / (1000 ** 3), 1)
+
+            if free_gb < 10:
+                sev = Severity.CRITICAL
+            elif free_gb < 30:
+                sev = Severity.WARNING
+            elif used_pct >= 95:
+                sev = Severity.CRITICAL
+            elif used_pct >= 85:
+                sev = Severity.WARNING
+            else:
+                sev = Severity.OK
+
+            fix = ""
+            if sev != Severity.OK:
+                fix = ("Run `sudo tmutil thinlocalsnapshots / 9999999999 1`"
+                       " to reclaim Time Machine snapshot space."
+                       " Also check ~/Library/Caches and Docker images.")
+
+            result.findings.append(Finding(
+                check="disk_health",
+                severity=sev,
+                summary=f"Boot disk {used_pct}% full — {free_gb} GB free",
+                fix=fix,
+            ))
     except (subprocess.TimeoutExpired, OSError, ValueError):
         pass
 
