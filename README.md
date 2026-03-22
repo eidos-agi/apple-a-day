@@ -16,7 +16,7 @@ aad checkup
 ```
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/eidos-agi/apple-a-day/main/demo/demo.gif" alt="apple-a-day demo" width="700">
+  <img src="https://raw.githubusercontent.com/eidos-agi/apple-a-day/main/demo/demo.svg" alt="apple-a-day checkup" width="700">
 </p>
 
 ## What it checks
