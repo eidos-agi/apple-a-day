@@ -102,7 +102,23 @@
   </div>
 </div>
 
-<footer>🍏 apple-a-day v0.2.0 · {{ now_str }} · {{ duration_ms }}ms</footer>
+<footer>
+  🍏 apple-a-day v0.2.0 · {{ now_str }} · {{ duration_ms }}ms
+  <br>
+  <button class="json-download" onclick="downloadJSON()">Download report as JSON</button>
+</footer>
+<script>
+function downloadJSON() {
+  const data = {{ report_json }};
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'apple-a-day-report-{{ now_str.replace(" ", "T") }}.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
 
 </div><!-- /main -->
 

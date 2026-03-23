@@ -385,39 +385,48 @@ def _compute_matrix(report) -> dict:
 
 # ── Action plan ──
 
-def _build_action_plan(criticals, warnings, spikes, offenders, stale_apps, redundant_apps) -> dict:
+def _build_action_plan(criticals, warnings, spikes, offenders, stale_apps, redundant_apps, matrix=None) -> dict:
+    # Score gain estimation: fixing a dimension from 0→100 or 50→100
+    # weighted by dimension weight, divided by total weight (17)
+    def _est_gain(dim: str, current: int, target: int = 100) -> int:
+        weights = {"stability": 3, "cpu": 3, "memory": 2, "thermal": 2, "storage": 2, "services": 2, "security": 1, "infra": 1, "network": 1}
+        w = weights.get(dim, 1)
+        return round((target - current) * w / 17)
+
+    m = matrix or {}
+
     immediate, longterm = [], []
     for item in criticals:
         if "crash-looping" in item["summary"].lower() or "crash loop" in item["summary"].lower():
-            immediate.append({"action": f"Stop crash loop: {item['summary'][:50]}", "impact": "Frees CPU from restart cycles", "effort": "1 min", "cmd": item.get("fix", "")})
+            immediate.append({"action": f"Stop crash loop: {item['summary'][:50]}", "impact": "Frees CPU from restart cycles", "effort": "1 min", "cmd": item.get("fix", ""), "score_gain": _est_gain("services", m.get("services", 0))})
     if spikes and any(s.get("ongoing") for s in spikes):
         s = next(s for s in spikes if s.get("ongoing"))
         procs = ", ".join(p[1] for p in s.get("top_processes", [])[:3])
-        immediate.append({"action": f"Active load spike (peak {s['peak_load']:.0f}x)", "impact": f"Culprits: {procs}", "effort": "5 min", "cmd": ""})
+        immediate.append({"action": f"Active load spike (peak {s['peak_load']:.0f}x)", "impact": f"Culprits: {procs}", "effort": "5 min", "cmd": "", "score_gain": _est_gain("cpu", m.get("cpu", 0))})
     sustained = [o for o in offenders if o.get("sustained")]
     for o in sustained[:2]:
-        immediate.append({"action": f"Investigate {o['name']} — {o['avg_cpu']}% avg CPU", "impact": f"Sustained strain: {o['total_cpu']:.0f} cumulative CPU-seconds", "effort": "10 min", "cmd": ""})
+        immediate.append({"action": f"Investigate {o['name']} — {o['avg_cpu']}% avg CPU", "impact": f"Sustained strain: {o['total_cpu']:.0f} cumulative CPU-seconds", "effort": "10 min", "cmd": "", "score_gain": 0})
     panics = [c for c in criticals if c["check"] == "Kernel Panics"]
     if len(panics) >= 5:
-        immediate.append({"action": f"Resolve kernel panic pattern ({len(panics)} panics)", "impact": "Mac will keep crashing until fixed", "effort": "30 min", "cmd": "aad checkup -c kernel_panics -c cpu_load --json"})
+        immediate.append({"action": f"Resolve kernel panic pattern ({len(panics)} panics)", "impact": "Mac will keep crashing until fixed", "effort": "30 min", "cmd": "aad checkup -c kernel_panics -c cpu_load --json", "score_gain": _est_gain("stability", m.get("stability", 0))})
     if any("swap" in w["summary"].lower() for w in warnings):
-        immediate.append({"action": "Reduce memory pressure", "impact": "Mac is using SSD as RAM, slowing everything", "effort": "5 min", "cmd": "See Memory Hogs table"})
+        immediate.append({"action": "Reduce memory pressure", "impact": "Mac is using SSD as RAM, slowing everything", "effort": "5 min", "cmd": "See Memory Hogs table", "score_gain": _est_gain("memory", m.get("memory", 0), 100)})
     orphans = [w for w in warnings if "orphaned" in w["summary"].lower()]
     if orphans:
-        longterm.append({"action": "Remove orphaned launch agents", "impact": "Eliminates wasted process spawns", "effort": "5 min", "cmd": orphans[0].get("fix", "")})
+        longterm.append({"action": "Remove orphaned launch agents", "impact": "Eliminates wasted process spawns", "effort": "5 min", "cmd": orphans[0].get("fix", ""), "score_gain": 2})
     if redundant_apps:
         names = [r["unused"]["name"] for r in redundant_apps[:3]]
-        longterm.append({"action": f"Uninstall {len(redundant_apps)} replaced app(s): {', '.join(names)}", "impact": "Reclaim disk, reduce background processes", "effort": "10 min", "cmd": ""})
+        longterm.append({"action": f"Uninstall {len(redundant_apps)} replaced app(s): {', '.join(names)}", "impact": "Reclaim disk, reduce background processes", "effort": "10 min", "cmd": "", "score_gain": _est_gain("storage", m.get("storage", 50), 100)})
     elif stale_apps:
-        longterm.append({"action": f"Review {len(stale_apps)} unused apps", "impact": "Reclaim disk space", "effort": "15 min", "cmd": ""})
+        longterm.append({"action": f"Review {len(stale_apps)} unused apps", "impact": "Reclaim disk space", "effort": "15 min", "cmd": "", "score_gain": _est_gain("storage", m.get("storage", 50), 100)})
     if any("disk" in w["check"].lower() and ("full" in w["summary"].lower() or "free" in w["summary"].lower()) for w in warnings):
-        longterm.append({"action": "Free disk space", "impact": "Prevents swap failures, enables updates", "effort": "20 min", "cmd": "sudo tmutil thinlocalsnapshots / 9999999999 1"})
+        longterm.append({"action": "Free disk space", "impact": "Prevents swap failures, enables updates", "effort": "20 min", "cmd": "sudo tmutil thinlocalsnapshots / 9999999999 1", "score_gain": _est_gain("storage", m.get("storage", 0))})
     brew = [w for w in warnings if w["check"] == "Homebrew"]
     if len(brew) >= 3:
-        longterm.append({"action": "Homebrew maintenance", "impact": "Security patches, reclaim cache space", "effort": "15 min", "cmd": "brew upgrade && brew cleanup"})
+        longterm.append({"action": "Homebrew maintenance", "impact": "Security patches, reclaim cache space", "effort": "15 min", "cmd": "brew upgrade && brew cleanup", "score_gain": _est_gain("infra", m.get("infra", 0))})
     from .launchd import _plist_path
     if not _plist_path().exists():
-        longterm.append({"action": "Install vitals monitor", "impact": "Better sustained pressure data in future reports", "effort": "1 min", "cmd": "aad install"})
+        longterm.append({"action": "Install vitals monitor", "impact": "Better sustained pressure data in future reports", "effort": "1 min", "cmd": "aad install", "score_gain": 0})
     return {"immediate": immediate[:5], "longterm": longterm[:5]}
 
 
@@ -468,6 +477,7 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     samples = read_vitals(minutes=vitals_minutes)
     cores = os.cpu_count() or 8
     info = report.mac_info
+    uptime = _get_uptime()
     ram_gb = info.get("memory_gb", 0)
 
     # Findings
@@ -566,7 +576,7 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     redundant = find_redundant_apps(all_apps_for_sim)
 
     # Action plan
-    action_plan = _build_action_plan(criticals, warnings, spikes, offenders, stale_apps, redundant)
+    action_plan = _build_action_plan(criticals, warnings, spikes, offenders, stale_apps, redundant, matrix)
 
     # Trend
     trend = None
@@ -600,7 +610,7 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
         current_load=current_load, load_pct=load_pct, load_color=load_color,
         swap_gb=swap_gb, swap_pct=swap_pct, swap_color=swap_color,
         disk_used_gb=disk_used_gb, disk_total_gb=disk_total_gb, disk_pct=disk_pct, disk_color=disk_color,
-        uptime=_get_uptime(),
+        uptime=uptime,
         # Load
         load_values=load_values,
         load_peak=max(load_values) if load_values else 0,
@@ -626,7 +636,26 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
         immediate=action_plan["immediate"], longterm=action_plan["longterm"],
         # Trend
         trend=trend,
+        # JSON download
+        report_json=_build_report_json(
+            grade, overall, matrix, criticals, warnings, infos,
+            action_plan, trend, info, cores, ram_gb, uptime,
+        ),
     )
+
+
+def _build_report_json(grade, overall, matrix, criticals, warnings, infos,
+                       action_plan, trend, mac_info, cores, ram_gb, uptime) -> str:
+    """Build JSON blob for the download button."""
+    import json
+    data = {
+        "grade": grade, "score": overall, "matrix": matrix,
+        "mac": mac_info, "cores": cores, "ram_gb": ram_gb, "uptime": uptime,
+        "criticals": criticals, "warnings": warnings, "infos": infos,
+        "actions": action_plan, "trend": trend,
+        "generated": datetime.now().isoformat(timespec="seconds"),
+    }
+    return json.dumps(data)
 
 
 def open_report(vitals_minutes: int = 60) -> Path:
