@@ -31,6 +31,83 @@ VITALS_LOG = LOG_DIR / "vitals.ndjson"
 MAX_VITALS_SIZE = 5 * 1024 * 1024  # 5 MB (~25 days at 1/min), then rotate
 
 
+def _identify_process(args: str) -> str:
+    """Turn a full command line into a short, meaningful process name.
+
+    Goal: "python3.12" is useless. "uvicorn omni.api" or "tosh sync" is useful.
+    """
+    parts = args.split()
+    if not parts:
+        return "?"
+    binary = parts[0].rsplit("/", 1)[-1]
+
+    # uvicorn / gunicorn — can be invoked directly, not through python
+    if binary in ("uvicorn", "gunicorn") or binary.endswith("uvicorn") or binary.endswith("gunicorn"):
+        app = parts[1].split(":")[0] if len(parts) > 1 and not parts[1].startswith("-") else "?"
+        app_short = ".".join(app.split(".")[:2]) if "." in app else app
+        return f"uvicorn:{app_short}"
+
+    # Python processes — identify by what they're running
+    if "python" in binary.lower():
+        # uvicorn / gunicorn run via python
+        for i, p in enumerate(parts):
+            if p in ("uvicorn", "gunicorn") or p.endswith("uvicorn") or p.endswith("gunicorn"):
+                app = parts[i + 1].split(":")[0] if i + 1 < len(parts) else "?"
+                # Shorten: omni.api.main → omni.api
+                app_short = ".".join(app.split(".")[:2]) if "." in app else app
+                return f"uvicorn:{app_short}"
+        # python -m module
+        if "-m" in parts:
+            idx = parts.index("-m")
+            if idx + 1 < len(parts):
+                module = parts[idx + 1]
+                # Shorten: tosh.cli.sync → tosh.sync
+                mod_parts = module.split(".")
+                if len(mod_parts) > 2:
+                    module = f"{mod_parts[0]}.{mod_parts[-1]}"
+                return f"py:{module}"
+        # Installed console_scripts: python3.12 /path/to/bin/railguey serve
+        # or: python3.12 /path/to/bin/resume-resume-mcp
+        for p in parts[1:]:
+            if p.startswith("-"):
+                continue
+            script_name = p.rsplit("/", 1)[-1]
+            if "/" in p and "/bin/" in p and not script_name.startswith("python"):
+                # It's an installed script like railguey, omni-mcp, etc.
+                extra = " ".join(parts[parts.index(p) + 1:])[:20]
+                label = script_name
+                if extra:
+                    label = f"{script_name} {extra}".strip()
+                return label
+            if p.endswith(".py"):
+                path_parts = p.rsplit("/", 2)
+                if len(path_parts) >= 2:
+                    parent = path_parts[-2]
+                    script = path_parts[-1].replace(".py", "")
+                    return f"py:{parent}/{script}"
+                return f"py:{p.rsplit('/', 1)[-1].replace('.py', '')}"
+            break  # first non-flag arg that isn't a script → give up
+        # pip
+        if any("pip" in p for p in parts):
+            return "pip"
+        return binary
+
+    # Node processes
+    if "node" in binary.lower():
+        for p in parts[1:]:
+            if "next" in p.lower():
+                return "next.js"
+            if "vite" in p.lower():
+                return "vite"
+            if p.endswith(".js") or p.endswith(".ts"):
+                return f"node:{p.rsplit('/', 1)[-1]}"
+        return "node"
+
+    # For everything else, use the binary name
+    # But clean up common macOS paths
+    return binary.replace(".app/Contents/MacOS/", ":")
+
+
 def sample() -> dict:
     """Take a single vitals sample. Fast — targets <500ms."""
     s = {
@@ -39,21 +116,21 @@ def sample() -> dict:
         "cores": os.cpu_count() or 0,
     }
 
-    # Top 5 CPU consumers (fast — no subprocess timeout concern)
+    # Top 5 CPU consumers with meaningful identity
     try:
         out = subprocess.run(
-            ["ps", "-eo", "pcpu,comm", "-r"],
+            ["ps", "-eo", "pcpu,args", "-r"],
             capture_output=True, text=True, timeout=5,
         )
         if out.returncode == 0:
             hogs = []
-            for line in out.stdout.strip().split("\n")[1:6]:
+            for line in out.stdout.strip().split("\n")[1:8]:
                 parts = line.strip().split(None, 1)
                 if len(parts) == 2:
                     cpu = float(parts[0])
                     if cpu < 5:
                         break
-                    name = parts[1].rsplit("/", 1)[-1]
+                    name = _identify_process(parts[1])
                     hogs.append([round(cpu, 1), name])
             s["top"] = hogs
     except (subprocess.TimeoutExpired, OSError):
