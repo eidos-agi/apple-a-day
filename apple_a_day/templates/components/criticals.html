@@ -1,5 +1,5 @@
 {% if criticals %}
-<h2 id="criticals" style="color:#dc2626">Critical Issues ({{ criticals|length }})</h2>
+<h2 style="color:#dc2626">Critical Issues ({{ criticals|length }})</h2>
 <div class="card">
   {% for check, items in criticals_by_check %}
   <div class="finding">

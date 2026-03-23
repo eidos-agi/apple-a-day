@@ -60,6 +60,11 @@ h2 { font-size: 15px; font-weight: 600; color: #475569; margin: 28px 0 12px; bor
 .sysinfo-bar { height: 4px; background: #e7e5e0; border-radius: 2px; margin-top: 6px; overflow: hidden; }
 .sysinfo-fill { height: 100%; border-radius: 2px; }
 
+/* Sections — visual break between report areas */
+section { padding-top: 20px; margin-top: 8px; border-top: 2px solid #e7e5e0; scroll-margin-top: 60px; }
+section:first-of-type { border-top: none; margin-top: 0; padding-top: 0; }
+.section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #94a3b8; margin-bottom: 12px; }
+
 /* Cards */
 .card { background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; padding: 16px 20px; margin: 12px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
 

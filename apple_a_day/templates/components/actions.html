@@ -3,7 +3,7 @@
 
 {% if immediate %}
 <div class="focus-box" style="border-color:#dc2626">
-  <h2 id="actions" style="color:#dc2626;margin:0 0 12px">Immediate Fixes — stop the bleeding</h2>
+  <h2 style="color:#dc2626;margin:0 0 12px">Immediate Fixes — stop the bleeding</h2>
   {% for a in immediate %}
   <div class="focus-item" style="padding:8px 0;border-bottom:1px solid #f1f5f9">
     <div><b>{{ loop.index }}. {{ a.action }}</b> <span style="color:#94a3b8;font-size:12px">({{ a.effort }})</span></div>

@@ -36,36 +36,76 @@
 </div>
 
 {% include 'components/header.html' %}
-{% include 'components/bluf.html' %}
-{% include 'components/sysinfo.html' %}
+
+<section id="bluf">
+  <div class="section-label">BLUF</div>
+  {% include 'components/bluf.html' %}
+</section>
+
+<section id="sysinfo">
+  <div class="section-label">System</div>
+  {% include 'components/sysinfo.html' %}
+</section>
 
 <div class="l2">
-  {% include 'components/matrix.html' %}
+  <section id="matrix">
+    <div class="section-label">Health Matrix</div>
+    {% include 'components/matrix.html' %}
+  </section>
 
   <div class="l3">
-    {% include 'components/sparkline.html' %}
+    <section id="load">
+      <div class="section-label">Load History</div>
+      {% include 'components/sparkline.html' %}
+    </section>
   </div>
 
-  {% include 'components/pressure.html' %}
+  <section id="pressure">
+    <div class="section-label">Pressure</div>
+    {% include 'components/pressure.html' %}
+  </section>
 
   <div class="l3">
-    {% include 'components/hogs.html' %}
+    <section id="hogs">
+      <div class="section-label">Process Hogs</div>
+      {% include 'components/hogs.html' %}
+    </section>
   </div>
 
-  {% include 'components/criticals.html' %}
+  <section id="criticals">
+    <div class="section-label">Critical Issues</div>
+    {% include 'components/criticals.html' %}
+  </section>
 
   <div class="l3">
-    {% include 'components/warnings.html' %}
-    {% include 'components/cleanup.html' %}
-    {% include 'components/redundant.html' %}
+    <section id="warnings">
+      <div class="section-label">Warnings</div>
+      {% include 'components/warnings.html' %}
+    </section>
+
+    <section id="cleanup">
+      <div class="section-label">App Cleanup</div>
+      {% include 'components/cleanup.html' %}
+    </section>
+
+    <section id="redundant">
+      <div class="section-label">Redundant Apps</div>
+      {% include 'components/redundant.html' %}
+    </section>
   </div>
 </div>
 
-{% include 'components/actions.html' %}
+<section id="actions">
+  <div class="section-label">Actions</div>
+  {% include 'components/actions.html' %}
+</section>
 
 <div class="l3">
-  {% include 'components/info.html' %}
-  {% include 'components/trend.html' %}
+  <section>
+    <div class="section-label">Info &amp; Trend</div>
+    {% include 'components/info.html' %}
+    {% include 'components/trend.html' %}
+  </section>
 </div>
 
 <footer>🍏 apple-a-day v0.2.0 · {{ now_str }} · {{ duration_ms }}ms</footer>
