@@ -632,6 +632,10 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
   .finding-fix {{ word-wrap: break-word; overflow-wrap: break-word; }}
   .matrix-issue {{ font-size: 12px; color: #64748b; margin-left: 8px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
   .matrix-row {{ flex-wrap: nowrap; overflow: hidden; }}
+  .detail-toggle {{ display: flex; align-items: center; gap: 8px; margin-bottom: 20px; padding: 10px 16px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; font-size: 13px; color: #475569; user-select: none; }}
+  .detail-toggle input {{ width: 16px; height: 16px; accent-color: #0284c7; }}
+  .detail-section {{ display: none; }}
+  .detail-section.visible {{ display: block; }}
   footer {{ margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }}
 </style>
 </head>
@@ -665,6 +669,13 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
   <div class="sysinfo-item"><div class="sysinfo-val">{cores}</div><div class="sysinfo-label">Cores</div></div>
   <div class="sysinfo-item"><div class="sysinfo-val">{uptime}</div><div class="sysinfo-label">Uptime</div></div>
 </div>
+"""
+
+    # ── Detail toggle ──
+    html += """<label class="detail-toggle">
+  <input type="checkbox" id="detailToggle" onchange="document.querySelectorAll('.detail-section').forEach(s => s.classList.toggle('visible', this.checked))">
+  Show detailed analysis
+</label>
 """
 
     # ── Focus box ──
@@ -702,6 +713,8 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
         issue = dim_worst.get(dim, "")
         issue_html = f'<span class="matrix-issue">{_esc(issue[:60])}</span>' if issue else ""
         html += f'<div class="matrix-row"><span class="matrix-label">{label}</span>{_bar_svg(val)}<span class="matrix-val">{val}</span>{issue_html}</div>\n'
+
+    html += '<div class="detail-section">\n'
 
     # ── Load Sparkline ──
     if samples:
@@ -924,6 +937,8 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
         arrow = {"improving": ("↑ improving", "trend-up"), "degrading": ("↓ degrading", "trend-down"),
                  "stable": ("→ stable", "trend-flat")}.get(trend, ("?", ""))
         html += f'<h2>Trend</h2>\n<div class="card trend-card"><span class="{arrow[1]}" style="font-size:16px">{arrow[0]}</span></div>\n'
+
+    html += '</div><!-- end detail-section -->\n'
 
     html += f"""
 <footer>apple-a-day v0.2.0 · {now_str} · {report.duration_ms}ms</footer>

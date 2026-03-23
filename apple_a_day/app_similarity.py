@@ -174,21 +174,28 @@ _SYNONYM_GROUPS = [
     # Password managers
     {"1Password", "Bitwarden", "LastPass", "Dashlane", "KeePassXC"},
     # Screen recording
-    {"Camtasia", "OBS", "ScreenFlow", "CleanShot X", "Loom"},
+    {"Camtasia", "Camtasia 2024", "OBS", "ScreenFlow", "CleanShot X", "Loom"},
     # Remote desktop
-    {"Splashtop Streamer", "Chrome Remote Desktop", "AnyDesk", "TeamViewer"},
+    {"Splashtop Streamer", "Splashtop Business", "Chrome Remote Desktop Host",
+     "Chrome Remote Desktop Host Uninstaller", "AnyDesk", "TeamViewer"},
 ]
 
 
 def _known_synonym_score(name_a: str, name_b: str) -> float:
-    """Check if two apps are in the same known synonym group."""
+    """Check if two apps are in the same known synonym group.
+
+    Uses exact match against group entries to avoid false positives
+    like "Chrome" matching both browsers and remote desktop groups.
+    """
     na = name_a.lower().strip()
     nb = name_b.lower().strip()
 
     for group in _SYNONYM_GROUPS:
         lower_group = {n.lower() for n in group}
-        matches_a = any(na in g or g in na for g in lower_group)
-        matches_b = any(nb in g or g in nb for g in lower_group)
+        # Exact match or the group entry is a suffix of the app name
+        # (handles "Google Chrome" matching "Chrome" in the group)
+        matches_a = na in lower_group or any(na.endswith(g) for g in lower_group)
+        matches_b = nb in lower_group or any(nb.endswith(g) for g in lower_group)
         if matches_a and matches_b:
             return 1.0
     return 0.0
@@ -206,6 +213,10 @@ def _category_score(cat_a: str, cat_b: str) -> float:
             "public.app-category.business",
             "public.app-category.entertainment",
             "public.app-category.lifestyle",
+            "public.app-category.video",
+            "public.app-category.photography",
+            "public.app-category.music",
+            "public.app-category.education",
         }
         if cat_a in broad:
             return 0.3  # weak match — needs other signals to confirm
