@@ -669,14 +669,15 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
 <title>apple-a-day — {grade} ({overall}/100)</title>
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  body {{ background: #f8fafc; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 24px; max-width: 860px; margin: 0 auto; font-size: 14px; line-height: 1.5; }}
+  body {{ background: #faf9f6; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 24px; max-width: 860px; margin: 0 auto; font-size: 14px; line-height: 1.5; }}
   code, .mono {{ font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }}
   h1 {{ font-size: 20px; font-weight: 700; margin-bottom: 4px; }}
-  h2 {{ font-size: 15px; font-weight: 600; color: #475569; margin: 28px 0 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }}
-  .header {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }}
-  .header-left h1 {{ color: #0f172a; }}
+  h2 {{ font-size: 15px; font-weight: 600; color: #475569; margin: 28px 0 12px; border-bottom: 1px solid #e7e5e0; padding-bottom: 6px; }}
+  .header {{ background: linear-gradient(135deg, #f0f7f0 0%, #fff 60%); border: 1px solid #d4e5d4; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }}
+  .header-left h1 {{ color: #1a3a1a; }}
+  .header-left h1::before {{ content: "🍎 "; }}
   .header-left .subtitle {{ color: #64748b; font-size: 13px; margin-top: 4px; }}
-  .bluf {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }}
+  .bluf {{ background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }}
   .bluf-label {{ font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 6px; }}
   .bluf-summary {{ font-size: 15px; line-height: 1.6; }}
   .bluf-counts {{ display: flex; gap: 12px; margin-top: 12px; font-size: 12px; }}
@@ -685,13 +686,13 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
   .bluf-count.warn {{ background: #fffbeb; color: #92400e; }}
   .bluf-count.info {{ background: #eff6ff; color: #1e40af; }}
   .sysinfo {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px; }}
-  .sysinfo-item {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; text-align: center; }}
+  .sysinfo-item {{ background: #fff; border: 1px solid #e7e5e0; border-radius: 6px; padding: 12px 16px; text-align: center; }}
   .sysinfo-val {{ font-size: 18px; font-weight: 700; color: #0f172a; font-family: 'SF Mono', monospace; }}
   .sysinfo-denom {{ font-size: 12px; font-weight: 400; color: #94a3b8; }}
   .sysinfo-label {{ font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }}
   .sysinfo-bar {{ height: 4px; background: #e2e8f0; border-radius: 2px; margin-top: 6px; overflow: hidden; }}
   .sysinfo-fill {{ height: 100%; border-radius: 2px; }}
-  .card {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin: 12px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }}
+  .card {{ background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; padding: 16px 20px; margin: 12px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }}
   .matrix-row {{ display: flex; align-items: center; margin: 6px 0; }}
   .matrix-label {{ width: 90px; font-size: 13px; color: #475569; }}
   .matrix-val {{ font-size: 13px; color: #64748b; margin-left: 8px; width: 30px; text-align: right; font-family: 'SF Mono', monospace; }}
@@ -700,7 +701,7 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
   .finding-fix {{ font-size: 13px; color: #475569; margin-top: 6px; padding-left: 16px; border-left: 2px solid #e2e8f0; }}
   .offender {{ display: flex; align-items: center; margin: 6px 0; font-size: 13px; }}
   .offender-name {{ width: 200px; color: #1e293b; font-family: 'SF Mono', monospace; }}
-  .focus-box {{ background: #fff; border: 2px solid #0284c7; border-radius: 8px; padding: 20px; margin: 20px 0; }}
+  .focus-box {{ background: #fff; border: 2px solid #5a9a5a; border-radius: 8px; padding: 20px; margin: 20px 0; }}
   .focus-box h2 {{ border-bottom: none; margin: 0 0 12px; color: #0f172a; font-size: 16px; }}
   .focus-item {{ padding: 6px 0; font-size: 14px; }}
   .focus-item .tag {{ font-weight: 700; }}
@@ -738,7 +739,8 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
   .detail-toggle input {{ width: 16px; height: 16px; accent-color: #0284c7; }}
   .detail-section {{ display: none; }}
   .detail-section.visible {{ display: block; }}
-  footer {{ margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }}
+  footer {{ margin-top: 32px; padding-top: 16px; border-top: 1px solid #e7e5e0; font-size: 11px; color: #94a3b8; text-align: center; }}
+  footer::before {{ content: "🍏 "; }}
 </style>
 </head>
 <body>
@@ -847,8 +849,6 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
         issue = dim_worst.get(dim, "")
         issue_html = f'<span class="matrix-issue">{_esc(issue[:60])}</span>' if issue else ""
         html += f'<div class="matrix-row"><span class="matrix-label">{label}</span>{_bar_svg(val)}<span class="matrix-val">{val}</span>{issue_html}</div>\n'
-
-    html += '<div class="detail-section">\n'
 
     # ── Load Sparkline ──
     if samples:
@@ -971,6 +971,8 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
                 topics_shown.update(new_topics)
             html += '</div>\n'
         html += '</div>\n'
+
+    html += '<div class="detail-section">\n'
 
     # ── Warnings with trade-off framing ──
     if warnings:
