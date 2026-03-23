@@ -47,30 +47,21 @@
   {% include 'components/sysinfo.html' %}
 </section>
 
+<section id="actions">
+  <div class="section-label">Actions</div>
+  {% include 'components/actions.html' %}
+</section>
+
 <div class="l2">
   <section id="matrix">
     <div class="section-label">Health Matrix</div>
     {% include 'components/matrix.html' %}
   </section>
 
-  <div class="l3">
-    <section id="load">
-      <div class="section-label">Load History</div>
-      {% include 'components/sparkline.html' %}
-    </section>
-  </div>
-
   <section id="pressure">
     <div class="section-label">Pressure</div>
     {% include 'components/pressure.html' %}
   </section>
-
-  <div class="l3">
-    <section id="hogs">
-      <div class="section-label">Process Hogs</div>
-      {% include 'components/hogs.html' %}
-    </section>
-  </div>
 
   <section id="criticals">
     <div class="section-label">Critical Issues</div>
@@ -78,6 +69,16 @@
   </section>
 
   <div class="l3">
+    <section id="load">
+      <div class="section-label">Load History</div>
+      {% include 'components/sparkline.html' %}
+    </section>
+
+    <section id="hogs">
+      <div class="section-label">Process Hogs</div>
+      {% include 'components/hogs.html' %}
+    </section>
+
     <section id="warnings">
       <div class="section-label">Warnings</div>
       {% include 'components/warnings.html' %}
@@ -92,20 +93,13 @@
       <div class="section-label">Redundant Apps</div>
       {% include 'components/redundant.html' %}
     </section>
+
+    <section>
+      <div class="section-label">Info &amp; Trend</div>
+      {% include 'components/info.html' %}
+      {% include 'components/trend.html' %}
+    </section>
   </div>
-</div>
-
-<section id="actions">
-  <div class="section-label">Actions</div>
-  {% include 'components/actions.html' %}
-</section>
-
-<div class="l3">
-  <section>
-    <div class="section-label">Info &amp; Trend</div>
-    {% include 'components/info.html' %}
-    {% include 'components/trend.html' %}
-  </section>
 </div>
 
 <footer>🍏 apple-a-day v0.2.0 · {{ now_str }} · {{ duration_ms }}ms</footer>
