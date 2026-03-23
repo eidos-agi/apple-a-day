@@ -504,25 +504,50 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     # Load
     load_values = [s["load"][0] for s in samples if "load" in s] if samples else []
 
-    # System info
+    # System info — swap from vitals or direct sysctl
     swap_mb = vitals_data.get("swap", {}).get("current_mb") or 0
+    if not swap_mb:
+        try:
+            out = subprocess.run(["sysctl", "vm.swapusage"], capture_output=True, text=True, timeout=5)
+            if out.returncode == 0 and "used" in out.stdout:
+                swap_mb = float(out.stdout.split("used = ")[1].split(" ")[0].rstrip("M"))
+        except Exception:
+            pass
     swap_gb = round(swap_mb / 1024, 1)
     swap_pct = int(swap_gb / ram_gb * 100) if ram_gb else 0
     swap_color = "#ef4444" if swap_pct > 50 else "#ca8a04" if swap_pct > 25 else "#22c55e"
-    current_load = samples[-1]["load"][0] if samples and "load" in samples[-1] else 0
+    current_load = samples[-1]["load"][0] if samples and "load" in samples[-1] else os.getloadavg()[0]
     load_pct = int(current_load / cores * 100) if cores else 0
     load_color = "#ef4444" if load_pct > 200 else "#ca8a04" if load_pct > 100 else "#22c55e"
 
-    # Disk
-    disk_total_gb = disk_used_gb = disk_pct = 0
+    # Disk — use diskutil for accurate APFS numbers
+    disk_total_gb = disk_used_gb = disk_free_gb = disk_pct = 0
     try:
-        out = subprocess.run(["df", "-g", "/"], capture_output=True, text=True, timeout=5)
+        out = subprocess.run(["diskutil", "info", "/"], capture_output=True, text=True, timeout=10)
         if out.returncode == 0:
-            parts = out.stdout.strip().split("\n")[1].split()
-            disk_total_gb, disk_used_gb = int(parts[1]), int(parts[2])
-            disk_pct = int(disk_used_gb / disk_total_gb * 100) if disk_total_gb else 0
+            for line in out.stdout.split("\n"):
+                if "Container Total Space" in line or "Volume Total Space" in line:
+                    # "Container Total Space:  926.4 GB (994662584320 Bytes)"
+                    num = line.split(":")[1].strip().split()[0]
+                    disk_total_gb = int(float(num))
+                elif "Volume Available Space" in line or "Container Free Space" in line:
+                    num = line.split(":")[1].strip().split()[0]
+                    disk_free_gb = int(float(num))
+            if disk_total_gb and disk_free_gb:
+                disk_used_gb = disk_total_gb - disk_free_gb
+                disk_pct = int(disk_used_gb / disk_total_gb * 100)
     except Exception:
-        pass
+        # Fallback to df with corrected math
+        try:
+            out = subprocess.run(["df", "-g", "/"], capture_output=True, text=True, timeout=5)
+            if out.returncode == 0:
+                parts = out.stdout.strip().split("\n")[1].split()
+                disk_total_gb = int(parts[1])
+                disk_avail_gb = int(parts[3])
+                disk_used_gb = disk_total_gb - disk_avail_gb
+                disk_pct = int(disk_used_gb / disk_total_gb * 100) if disk_total_gb else 0
+        except Exception:
+            pass
     disk_color = "#ef4444" if disk_pct > 90 else "#ca8a04" if disk_pct > 75 else "#22c55e"
 
     # Process tables
