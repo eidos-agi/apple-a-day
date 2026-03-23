@@ -145,6 +145,15 @@ def _find_stale_apps() -> list[dict]:
         else:
             days_ago = 999  # never used / unknown
 
+        # Get app size
+        try:
+            size_bytes = sum(
+                f.stat().st_size for f in Path(app_path).rglob("*") if f.is_file()
+            ) if os.path.isdir(app_path) else 0
+        except (OSError, PermissionError):
+            size_bytes = 0
+        size_mb = round(size_bytes / (1024 * 1024))
+
         # Skip if used in the last 30 days
         if days_ago < 30:
             continue
@@ -178,6 +187,7 @@ def _find_stale_apps() -> list[dict]:
                 "last_used": f"{days_ago}d ago" if days_ago < 999 else "never",
                 "days_ago": days_ago,
                 "has_agent": has_agent,
+                "size_mb": size_mb,
                 "score": round(c, 3),
             })
 
