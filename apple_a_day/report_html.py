@@ -198,6 +198,73 @@ def _cleanup_scatterplot(stale_apps: list[dict], width: int = 780, height: int =
     return svg
 
 
+def _get_live_process_tables() -> tuple[list[dict], list[dict]]:
+    """Get current top CPU and memory consumers."""
+    cpu_hogs = []
+    mem_hogs = []
+    try:
+        # CPU sorted
+        out = subprocess.run(["ps", "-eo", "pid,pcpu,pmem,comm", "-r"],
+                             capture_output=True, text=True, timeout=5)
+        if out.returncode == 0:
+            for line in out.stdout.strip().split("\n")[1:15]:
+                parts = line.split(None, 3)
+                if len(parts) < 4:
+                    continue
+                pid, cpu, mem, comm = parts
+                cpu_val = float(cpu)
+                if cpu_val < 5:
+                    break
+                name = comm.rsplit("/", 1)[-1]
+                cpu_hogs.append({"pid": pid, "cpu": cpu, "mem": mem, "name": name})
+
+        # Memory sorted
+        out = subprocess.run(["ps", "-eo", "pid,pcpu,pmem,comm", "-m"],
+                             capture_output=True, text=True, timeout=5)
+        if out.returncode == 0:
+            for line in out.stdout.strip().split("\n")[1:15]:
+                parts = line.split(None, 3)
+                if len(parts) < 4:
+                    continue
+                pid, cpu, mem, comm = parts
+                mem_val = float(mem)
+                if mem_val < 1.0:
+                    break
+                name = comm.rsplit("/", 1)[-1]
+                mem_hogs.append({"pid": pid, "cpu": cpu, "mem": mem, "name": name})
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+    return cpu_hogs, mem_hogs
+
+
+def _process_action(name: str) -> str:
+    """Suggest what to do about a resource-heavy process."""
+    known = {
+        "WindowServer": "System process — cannot be killed. Reduce windows/displays.",
+        "kernel_task": "Thermal management — reduce workload, check ventilation.",
+        "mds_stores": "Spotlight indexing — wait or exclude folders in System Settings → Siri & Spotlight.",
+        "fileproviderd": "Cloud sync (OneDrive/iCloud) — pause sync or reduce sync folders.",
+        "trustd": "Certificate validation — transient, resolves after sync completes.",
+        "XprotectService": "Security scan — transient, let it finish.",
+        "mediaanalysisd": "Photo/video analysis — transient background task.",
+        "bird": "iCloud sync daemon — pause iCloud or wait.",
+        "OneDrive": "OneDrive sync — pause in menu bar or reduce sync scope.",
+        "Dropbox": "Dropbox sync — pause in menu bar.",
+        "Docker Desktop": "Docker VM — check resource limits in Docker Desktop → Settings → Resources.",
+        "prl_client_app": "Parallels VM — suspend or shut down the VM.",
+        "node": "Node.js process — check which dev server is running.",
+        "python3": "Python process — identify which script/server via Activity Monitor.",
+    }
+    # Exact match
+    if name in known:
+        return known[name]
+    # Partial match
+    for key, advice in known.items():
+        if key.lower() in name.lower():
+            return advice
+    return f'<span class="action-cmd">kill -15 $(pgrep -f "{_esc(name)}")</span>'
+
+
 def _esc(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -423,6 +490,13 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
   .trend-up {{ color: #16a34a; }}
   .trend-down {{ color: #dc2626; }}
   .trend-flat {{ color: #64748b; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+  th {{ text-align: left; padding: 8px 12px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }}
+  td {{ padding: 6px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }}
+  tr:hover {{ background: #f8fafc; }}
+  .mono {{ font-family: 'SF Mono', monospace; font-size: 12px; }}
+  .action-cmd {{ background: #f1f5f9; padding: 2px 8px; border-radius: 3px; font-family: 'SF Mono', monospace; font-size: 11px; color: #334155; display: inline-block; margin-top: 2px; }}
+  .matrix-issue {{ font-size: 12px; color: #64748b; margin-left: 8px; flex: 1; }}
   footer {{ margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }}
 </style>
 </head>
@@ -467,13 +541,32 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
             html += f'<div class="focus-item">{i}. <span class="tag tag-{tag.lower()}">{tag}</span> {_esc(rest)}</div>\n'
         html += '</div>\n'
 
-    # ── Health Matrix ──
+    # ── Health Matrix (with worst finding per dimension) ──
+    # Map dimensions to check names for finding lookup
+    dim_check_map = {
+        "stability": ["Crash Loops", "Kernel Panics", "Shutdown Causes"],
+        "cpu": ["CPU Load"], "thermal": ["Thermal"], "memory": ["Memory Pressure"],
+        "storage": ["Disk Health"], "services": ["Launch Agents"],
+        "security": ["Security"], "infra": ["Dynamic Library Health", "Homebrew"],
+        "network": ["Network"],
+    }
+    # Find worst finding per dimension
+    dim_worst: dict[str, str] = {}
+    all_findings = criticals + warnings
+    for dim, checks in dim_check_map.items():
+        for item in all_findings:
+            if item["check"] in checks:
+                dim_worst[dim] = item["summary"]
+                break
+
     html += '<h2>Health Matrix</h2>\n'
     for dim, label in [("stability", "Stability"), ("cpu", "CPU"), ("thermal", "Thermal"),
                        ("memory", "Memory"), ("storage", "Storage"), ("services", "Services"),
                        ("security", "Security"), ("infra", "Infra"), ("network", "Network")]:
         val = matrix.get(dim, 100)
-        html += f'<div class="matrix-row"><span class="matrix-label">{label}</span>{_bar_svg(val)}<span class="matrix-val">{val}</span></div>\n'
+        issue = dim_worst.get(dim, "")
+        issue_html = f'<span class="matrix-issue">{_esc(issue[:60])}</span>' if issue else ""
+        html += f'<div class="matrix-row"><span class="matrix-label">{label}</span>{_bar_svg(val)}<span class="matrix-val">{val}</span>{issue_html}</div>\n'
 
     # ── Load Sparkline ──
     if samples:
@@ -492,13 +585,33 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
                     html += f'<div class="spike">▲ spike peak <b>{s["peak_load"]:.0f}x</b> — {_esc(procs)}{ongoing}</div>\n'
             html += _knowledge_card(["load_average"])
 
-    # ── Top Offenders ──
+    # ── Top Offenders (vitals history) ──
     if offenders:
-        max_app = max(o["appearances"] for o in offenders[:7])
-        html += '<h2>Top Resource Offenders</h2>\n<div class="card">\n'
+        html += '<h2>Top Resource Offenders (from vitals history)</h2>\n<div class="card">\n'
+        html += '<table><tr><th>Process</th><th>Seen in top-CPU</th><th>Peak CPU</th><th>Action</th></tr>\n'
         for o in offenders[:7]:
-            html += f'<div class="offender"><span class="offender-name">{_esc(o["name"])}</span>{_offender_bar(o["appearances"], max_app, o["peak_cpu"])}</div>\n'
-        html += '</div>\n'
+            action = _process_action(o["name"])
+            html += f'<tr><td class="mono">{_esc(o["name"])}</td><td>{o["appearances"]}x</td><td>{o["peak_cpu"]}%</td><td>{action}</td></tr>\n'
+        html += '</table></div>\n'
+
+    # ── Live Process Tables (CPU, Memory) ──
+    cpu_hogs, mem_hogs = _get_live_process_tables()
+
+    if cpu_hogs:
+        html += '<h2>CPU Hogs (right now)</h2>\n<div class="card">\n'
+        html += '<table><tr><th>Process</th><th>CPU %</th><th>MEM %</th><th>PID</th><th>Action</th></tr>\n'
+        for p in cpu_hogs:
+            action = _process_action(p["name"])
+            html += f'<tr><td class="mono">{_esc(p["name"])}</td><td><b>{p["cpu"]}</b></td><td>{p["mem"]}</td><td class="mono">{p["pid"]}</td><td>{action}</td></tr>\n'
+        html += '</table></div>\n'
+
+    if mem_hogs:
+        html += '<h2>Memory Hogs (right now)</h2>\n<div class="card">\n'
+        html += '<table><tr><th>Process</th><th>MEM %</th><th>CPU %</th><th>PID</th><th>Action</th></tr>\n'
+        for p in mem_hogs:
+            action = _process_action(p["name"])
+            html += f'<tr><td class="mono">{_esc(p["name"])}</td><td><b>{p["mem"]}</b></td><td>{p["cpu"]}</td><td class="mono">{p["pid"]}</td><td>{action}</td></tr>\n'
+        html += '</table></div>\n'
 
     # ── Critical Issues ──
     if criticals:
@@ -552,6 +665,17 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
         html += '<h2>App Cleanup Analysis</h2>\n<div class="card">\n'
         html += '<div style="font-size:13px;color:#475569;margin-bottom:8px">Apps plotted by size (impact) vs. time since last use. Top-right quadrant = high impact, rarely used — best removal candidates.</div>\n'
         html += _cleanup_scatterplot(stale_apps)
+        # Companion table — actionable list
+        remove_candidates = [a for a in stale_apps if a.get("days_ago", 0) > 90]
+        if remove_candidates:
+            html += '<table style="margin-top:12px"><tr><th>App</th><th>Size</th><th>Last Used</th><th>Action</th></tr>\n'
+            for a in remove_candidates[:10]:
+                size = a.get("size_mb", 0)
+                size_str = f"{size} MB" if size < 1024 else f"{size / 1024:.1f} GB"
+                name = _esc(a["name"])
+                html += f'<tr><td>{name}</td><td class="mono">{size_str}</td><td>{a.get("last_used", "?")}</td>'
+                html += f'<td><span class="action-cmd">sudo rm -rf "/Applications/{name}.app"</span></td></tr>\n'
+            html += '</table>\n'
         html += '</div>\n'
         html += _knowledge_card(["orphaned_agent"])
 
