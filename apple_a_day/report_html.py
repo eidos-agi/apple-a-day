@@ -356,6 +356,22 @@ def _identify_from_cmdline(cmdline: str, name: str) -> str:
     return f'<code style="font-size:11px;color:#475569">{_esc(short_cmd)}</code>'
 
 
+def _mini_sparkline(values: list[float], width: int = 80, height: int = 16) -> str:
+    """Tiny inline SVG sparkline for a process CPU history."""
+    if not values or len(values) < 2:
+        return '<span style="color:#94a3b8">—</span>'
+    mn, mx = min(values), max(values)
+    rng = mx - mn if mx != mn else 1
+    points = []
+    for i, v in enumerate(values):
+        x = i / max(len(values) - 1, 1) * width
+        y = height - ((v - mn) / rng * (height - 2)) - 1
+        points.append(f"{x:.0f},{y:.0f}")
+    return (f'<svg width="{width}" height="{height}" style="vertical-align:middle">'
+            f'<polyline points="{" ".join(points)}" fill="none" stroke="#0e7490" stroke-width="1.5"/>'
+            f'</svg>')
+
+
 def _is_daemon(cmdline: str) -> bool:
     """Detect if a process is a background daemon/service vs a user-facing app."""
     cl = cmdline.lower()
@@ -701,18 +717,37 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
                     html += f'<div class="spike">▲ spike peak <b>{s["peak_load"]:.0f}x</b> — {_esc(procs)}{ongoing}</div>\n'
             html += _knowledge_card(["load_average"])
 
-    # ── Top Offenders (vitals history) ──
+    # ── Sustained Pressure (from vitals time-series) ──
     if offenders:
-        html += '<h2>Top Resource Offenders (from vitals history)</h2>\n<div class="card">\n'
-        max_peak = max(o["peak_cpu"] for o in offenders[:7]) if offenders else 100
-        html += '<table><tr><th>Process</th><th style="width:200px">Peak CPU</th><th>Seen</th><th>Action</th></tr>\n'
-        for o in offenders[:7]:
-            action = _process_action(o["name"])
-            bar_w = int(o["peak_cpu"] / max(max_peak, 1) * 140)
-            color = "#ef4444" if o["peak_cpu"] > 50 else "#ca8a04" if o["peak_cpu"] > 20 else "#0284c7"
-            bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{o["peak_cpu"]}%</span></div>'
-            html += f'<tr><td class="mono">{_esc(o["name"])}</td><td>{bar}</td><td>{o["appearances"]}x</td><td>{action}</td></tr>\n'
-        html += '</table></div>\n'
+        sustained = [o for o in offenders if o.get("sustained")]
+        transient = [o for o in offenders if not o.get("sustained")]
+
+        if sustained:
+            html += '<h2>Sustained Pressure (long-running load)</h2>\n<div class="card">\n'
+            html += '<div style="font-size:12px;color:#64748b;margin-bottom:8px">Processes consuming CPU across >50% of the monitoring window. These cause crashes, not spikes.</div>\n'
+            max_total = max(o["total_cpu"] for o in sustained) if sustained else 1
+            html += '<table><tr><th>Process</th><th style="width:200px">Cumulative CPU</th><th>Avg CPU</th><th>Present</th><th>Pattern</th></tr>\n'
+            for o in sustained[:7]:
+                bar_w = int(o["total_cpu"] / max(max_total, 1) * 140)
+                color = "#ef4444" if o["avg_cpu"] > 30 else "#ca8a04" if o["avg_cpu"] > 10 else "#0284c7"
+                bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{o["total_cpu"]:.0f}%·s</span></div>'
+                spark = _mini_sparkline(o.get("cpu_series", []))
+                html += f'<tr><td class="mono">{_esc(o["name"])}</td><td>{bar}</td><td class="mono">{o["avg_cpu"]}%</td><td>{o["presence_pct"]:.0f}%</td><td>{spark}</td></tr>\n'
+            html += '</table></div>\n'
+            html += _knowledge_card(["load_average"])
+
+        if transient:
+            html += '<h2>Transient Load (spikes)</h2>\n<div class="card">\n'
+            html += '<div style="font-size:12px;color:#64748b;margin-bottom:8px">Processes that appeared briefly at high CPU. Usually normal (builds, scans, syncs).</div>\n'
+            max_peak = max(o["peak_cpu"] for o in transient[:7])
+            html += '<table><tr><th>Process</th><th style="width:200px">Peak CPU</th><th>Seen</th><th>Pattern</th></tr>\n'
+            for o in transient[:5]:
+                bar_w = int(o["peak_cpu"] / max(max_peak, 1) * 140)
+                color = "#ca8a04" if o["peak_cpu"] > 30 else "#0284c7"
+                bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{o["peak_cpu"]}%</span></div>'
+                spark = _mini_sparkline(o.get("cpu_series", []))
+                html += f'<tr><td class="mono">{_esc(o["name"])}</td><td>{bar}</td><td>{o["appearances"]}x</td><td>{spark}</td></tr>\n'
+            html += '</table></div>\n'
 
     # ── Live Process Tables (CPU, Memory) ──
     cpu_hogs, mem_hogs = _get_live_process_tables()

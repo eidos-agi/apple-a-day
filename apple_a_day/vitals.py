@@ -233,19 +233,36 @@ def analyze_vitals(minutes: int = 60) -> dict:
     swaps = [(s["ts"], s["swap_mb"]) for s in samples if "swap_mb" in s]
     swap_peak = max(swaps, key=lambda x: x[1]) if swaps else (None, 0)
 
-    # Worst offenders: processes appearing most often in top lists
+    # Worst offenders: per-process pressure analysis
     proc_stats: dict[str, dict] = {}
-    for s in samples:
+    for i, s in enumerate(samples):
         for item in s.get("top", []):
             name = item[1]
             cpu = item[0]
             if name not in proc_stats:
-                proc_stats[name] = {"appearances": 0, "peak_cpu": 0, "total_cpu": 0}
+                proc_stats[name] = {
+                    "appearances": 0, "peak_cpu": 0, "total_cpu": 0,
+                    "first_seen": i, "last_seen": i, "cpu_series": [],
+                }
             proc_stats[name]["appearances"] += 1
             proc_stats[name]["peak_cpu"] = max(proc_stats[name]["peak_cpu"], cpu)
             proc_stats[name]["total_cpu"] += cpu
+            proc_stats[name]["last_seen"] = i
+            proc_stats[name]["cpu_series"].append(cpu)
 
-    worst = sorted(proc_stats.items(), key=lambda x: x[1]["appearances"], reverse=True)[:10]
+    # Compute derived metrics
+    total_samples = len(samples)
+    for name, stats in proc_stats.items():
+        stats["avg_cpu"] = round(stats["total_cpu"] / max(stats["appearances"], 1), 1)
+        stats["presence_pct"] = round(stats["appearances"] / max(total_samples, 1) * 100, 1)
+        # Duration estimate: span from first to last seen
+        span = stats["last_seen"] - stats["first_seen"] + 1
+        stats["span_samples"] = span
+        # Sustained = present in >50% of samples AND avg CPU > 5%
+        stats["sustained"] = stats["presence_pct"] > 50 and stats["avg_cpu"] > 5
+
+    # Sort by total_cpu (cumulative pressure), not just appearances
+    worst = sorted(proc_stats.items(), key=lambda x: x[1]["total_cpu"], reverse=True)[:15]
 
     return {
         "samples": len(samples),

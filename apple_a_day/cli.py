@@ -286,6 +286,24 @@ def _fmt_load(load_list):
     return "/".join(f"{l:.0f}" for l in load_list[:3])
 
 
+def _cmd_install(_args):
+    """Install the vitals monitor daemon."""
+    from .launchd import install
+    print(install())
+
+
+def _cmd_uninstall(_args):
+    """Remove the vitals monitor daemon."""
+    from .launchd import uninstall
+    print(uninstall())
+
+
+def _cmd_status(_args):
+    """Check daemon status."""
+    from .launchd import status
+    print(status())
+
+
 def _cmd_profile(args):
     """Show or refresh Mac user profile."""
     from .profile import get_or_create_profile
@@ -388,6 +406,11 @@ def main(argv=None):
     p_vitals.add_argument("--minutes", type=int, default=60, help="Look back N minutes (default: 60)")
     p_vitals.add_argument("--json", action="store_true", dest="vitals_json", help="Output as JSON")
 
+    # install / uninstall / status (daemon management)
+    sub.add_parser("install", help="Install vitals monitor as a launchd daemon (samples every 60s)")
+    sub.add_parser("uninstall", help="Remove the vitals monitor daemon")
+    sub.add_parser("status", help="Check vitals monitor daemon status")
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -409,5 +432,8 @@ def main(argv=None):
         "trend": _cmd_trend,
         "monitor": _cmd_monitor,
         "vitals": _cmd_vitals,
+        "install": _cmd_install,
+        "uninstall": _cmd_uninstall,
+        "status": _cmd_status,
     }
     handlers[args.command](args)
