@@ -15,7 +15,11 @@ h2 { font-size: 15px; font-weight: 600; color: #475569; margin: 28px 0 12px; bor
 .sidebar nav a.nav-l2,
 .sidebar nav div.nav-l2,
 .sidebar nav a.nav-l3,
-.sidebar nav div.nav-l3 { display: none; }
+.sidebar nav div.nav-l3 { display: none !important; }
+.sidebar nav a.nav-l2.nav-show,
+.sidebar nav div.nav-l2.nav-show,
+.sidebar nav a.nav-l3.nav-show,
+.sidebar nav div.nav-l3.nav-show { display: block !important; }
 
 /* Main content — centered in right half */
 .main { margin-left: 180px; padding: 0 24px 24px; display: flex; flex-direction: column; align-items: center; }
