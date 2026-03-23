@@ -493,28 +493,125 @@ def _compute_matrix(report) -> dict:
     return matrix
 
 
-def _pick_focus(criticals, warnings, spikes, offenders) -> list[str]:
-    focus = []
-    if criticals:
-        by_check: dict[str, list] = {}
-        for c in criticals:
-            by_check.setdefault(c["check"], []).append(c)
-        for check, items in sorted(by_check.items(), key=lambda x: -len(x[1])):
-            fix = items[0].get("fix", "")[:80]
-            focus.append(f"FIX: {check} — {len(items)} critical issue(s). {fix}")
-            if len(focus) >= 2:
-                break
+def _build_action_plan(criticals, warnings, spikes, offenders, stale_apps, redundant_apps) -> dict:
+    """Build an impact-scored action plan split into immediate fixes and long-term wins.
+
+    Each action has: description, impact estimate, effort, command, and category.
+    """
+    immediate = []  # Fix now — actively causing harm
+    longterm = []   # Fix when you have time — improves health over time
+
+    # ── Immediate: crash-looping services ──
+    for item in criticals:
+        if "crash-looping" in item["summary"].lower() or "crash loop" in item["summary"].lower():
+            immediate.append({
+                "action": f"Stop crash loop: {item['summary'].split(':')[0] if ':' in item['summary'] else item['summary'][:50]}",
+                "impact": "Frees CPU from restart cycles, reduces kernel panic risk",
+                "effort": "1 min",
+                "cmd": item.get("fix", ""),
+            })
+
+    # ── Immediate: active load spikes ──
     if spikes:
         ongoing = [s for s in spikes if s.get("ongoing")]
         if ongoing:
-            procs = ", ".join(p[1] for p in ongoing[0].get("top_processes", []))
-            focus.append(f"NOW: Active load spike (peak {ongoing[0]['peak_load']:.0f}x) — {procs}")
-    if warnings and len(focus) < 3:
-        focus.append(f"REVIEW: {len(warnings)} warning(s) — {warnings[0]['summary'][:60]}")
-    if offenders and len(focus) < 3:
-        top = offenders[0]
-        focus.append(f"WATCH: {top['name']} appears in top-CPU {top['appearances']}x (peak {top['peak_cpu']}%)")
-    return focus[:3]
+            procs = ", ".join(p[1] for p in ongoing[0].get("top_processes", [])[:3])
+            immediate.append({
+                "action": f"Address active load spike (peak {ongoing[0]['peak_load']:.0f}x cores)",
+                "impact": f"System is overloaded right now — {procs} are the culprits",
+                "effort": "5 min",
+                "cmd": "",
+            })
+
+    # ── Immediate: sustained pressure offenders ──
+    sustained = [o for o in offenders if o.get("sustained")]
+    for o in sustained[:2]:
+        if o["name"] not in str(immediate):  # avoid duplicating crash loop entries
+            immediate.append({
+                "action": f"Investigate {o['name']} — sustained {o['avg_cpu']}% CPU across {o['presence_pct']:.0f}% of monitoring",
+                "impact": f"Cumulative load of {o['total_cpu']:.0f} CPU-seconds, ongoing system strain",
+                "effort": "10 min",
+                "cmd": "",
+            })
+
+    # ── Immediate: critical kernel panics (if pattern is clear) ──
+    panic_items = [c for c in criticals if c["check"] == "Kernel Panics"]
+    if len(panic_items) >= 5:
+        immediate.append({
+            "action": f"Resolve kernel panic pattern — {len(panic_items)} panics, likely caused by CPU starvation",
+            "impact": "Mac will keep crashing until root cause is fixed",
+            "effort": "30 min investigation",
+            "cmd": "aad checkup -c kernel_panics -c cpu_load -c launch_agents --json",
+        })
+
+    # ── Immediate: high swap ──
+    swap_warning = next((w for w in warnings if "swap" in w["summary"].lower()), None)
+    if swap_warning:
+        immediate.append({
+            "action": "Reduce memory pressure — find and close the biggest memory consumers",
+            "impact": "Mac is using SSD as RAM overflow, slowing everything down",
+            "effort": "5 min",
+            "cmd": "See Memory Hogs table below",
+        })
+
+    # ── Long-term: orphaned launch agents ──
+    orphan_warnings = [w for w in warnings if "orphaned" in w["summary"].lower()]
+    if orphan_warnings:
+        longterm.append({
+            "action": f"Remove {sum(int(w['summary'].split()[0]) for w in orphan_warnings if w['summary'][0].isdigit())} orphaned launch agent(s)",
+            "impact": "Eliminates wasted process spawns and log noise",
+            "effort": "5 min",
+            "cmd": orphan_warnings[0].get("fix", ""),
+        })
+
+    # ── Long-term: unused apps with alternatives ──
+    if redundant_apps:
+        names = [r["unused"]["name"] for r in redundant_apps[:3]]
+        longterm.append({
+            "action": f"Uninstall {len(redundant_apps)} app(s) you've replaced: {', '.join(names)}",
+            "impact": "Reclaim disk space, reduce background processes and login items",
+            "effort": "10 min",
+            "cmd": "See Safe to Remove table below",
+        })
+    elif stale_apps:
+        longterm.append({
+            "action": f"Review {len(stale_apps)} unused app(s) for removal",
+            "impact": "Reclaim disk space and reduce system cruft",
+            "effort": "15 min",
+            "cmd": "See App Cleanup Analysis below",
+        })
+
+    # ── Long-term: disk pressure ──
+    disk_warning = next((w for w in warnings if "disk" in w["check"].lower() and ("full" in w["summary"].lower() or "free" in w["summary"].lower())), None)
+    if disk_warning:
+        longterm.append({
+            "action": "Free disk space — clear caches, snapshots, Docker images",
+            "impact": "Prevents swap failures, enables macOS updates, improves SSD performance",
+            "effort": "20 min",
+            "cmd": disk_warning.get("fix", ""),
+        })
+
+    # ── Long-term: homebrew maintenance ──
+    brew_warnings = [w for w in warnings if w["check"] == "Homebrew"]
+    if len(brew_warnings) >= 3:
+        longterm.append({
+            "action": "Run Homebrew maintenance (brew upgrade, brew cleanup, brew doctor)",
+            "impact": "Security patches, bug fixes, reclaim cache space",
+            "effort": "15 min",
+            "cmd": "brew upgrade && brew cleanup",
+        })
+
+    # ── Long-term: install vitals monitor ──
+    from .launchd import _plist_path
+    if not _plist_path().exists():
+        longterm.append({
+            "action": "Install apple-a-day vitals monitor for continuous health tracking",
+            "impact": "Builds time-series data for sustained pressure analysis — future reports will be richer",
+            "effort": "1 min",
+            "cmd": "aad install",
+        })
+
+    return {"immediate": immediate[:5], "longterm": longterm[:5]}
 
 
 # ── Main report generator ──
@@ -553,7 +650,9 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
         older_c = sum(e.get("counts", {}).get("critical", 0) for e in history[:3]) / 3
         trend = "improving" if recent_c < older_c else "degrading" if recent_c > older_c else "stable"
 
-    focus = _pick_focus(criticals, warnings, spikes, offenders)
+    # Action plan is built later after stale_apps/redundant are computed
+    # Placeholder — will be rendered after data collection
+    _action_plan_data = {"criticals": criticals, "warnings": warnings, "spikes": spikes, "offenders": offenders}
     grade_color = {"A": "#22c55e", "B": "#22c55e", "C": "#ca8a04", "D": "#ef4444", "F": "#ef4444"}.get(grade, "#94a3b8")
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
     bluf_text = _generate_bluf(criticals, warnings, infos, spikes)
@@ -719,14 +818,8 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
 </label>
 """
 
-    # ── Focus box ──
-    if focus:
-        html += '<div class="focus-box"><h2>Focus</h2>\n'
-        for i, f in enumerate(focus, 1):
-            tag = f.split(":")[0] if ":" in f else "ACTION"
-            rest = f.split(":", 1)[1].strip() if ":" in f else f
-            html += f'<div class="focus-item">{i}. <span class="tag tag-{tag.lower()}">{tag}</span> {_esc(rest)}</div>\n'
-        html += '</div>\n'
+    # ── Action Plan (rendered later, after stale_apps/redundant are available) ──
+    # Placeholder — the actual rendering happens below after data collection
 
     # ── Health Matrix (with worst finding per dimension) ──
     # Map dimensions to check names for finding lookup
@@ -965,6 +1058,50 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
 
     if stale_apps or redundant:
         html += _knowledge_card(["orphaned_agent"])
+
+    # ── Action Plan (now that we have all data) ──
+    action_plan = _build_action_plan(criticals, warnings, spikes, offenders, stale_apps, redundant)
+    imm = action_plan["immediate"]
+    lt = action_plan["longterm"]
+
+    if imm or lt:
+        html += '</div><!-- close detail-section before action plan -->\n'
+        # Action plan is always visible (outside detail toggle)
+        html += '<div style="margin-top:24px">\n'
+
+    if imm:
+        html += '<div class="focus-box" style="border-color:#dc2626">\n'
+        html += '<h2 style="color:#dc2626;margin:0 0 12px">Immediate Fixes — stop the bleeding</h2>\n'
+        for i, a in enumerate(imm, 1):
+            html += f'<div class="focus-item" style="padding:8px 0;border-bottom:1px solid #f1f5f9">\n'
+            html += f'<div><b>{i}. {_esc(a["action"])}</b> <span style="color:#94a3b8;font-size:12px">({a["effort"]})</span></div>\n'
+            html += f'<div style="font-size:13px;color:#475569;margin-top:2px">{_esc(a["impact"])}</div>\n'
+            if a.get("cmd"):
+                html += f'<div style="margin-top:4px"><span class="action-cmd">{_esc(a["cmd"][:120])}</span></div>\n'
+            html += '</div>\n'
+        html += '</div>\n'
+
+    if lt:
+        html += '<div class="focus-box" style="border-color:#0284c7">\n'
+        html += '<h2 style="color:#0284c7;margin:0 0 12px">Long-Term Wins — build a healthier system</h2>\n'
+        for i, a in enumerate(lt, 1):
+            html += f'<div class="focus-item" style="padding:8px 0;border-bottom:1px solid #f1f5f9">\n'
+            html += f'<div><b>{i}. {_esc(a["action"])}</b> <span style="color:#94a3b8;font-size:12px">({a["effort"]})</span></div>\n'
+            html += f'<div style="font-size:13px;color:#475569;margin-top:2px">{_esc(a["impact"])}</div>\n'
+            if a.get("cmd"):
+                html += f'<div style="margin-top:4px"><span class="action-cmd">{_esc(a["cmd"][:120])}</span></div>\n'
+            # For app removal long-term items, show the redundant pairs inline
+            if "uninstall" in a["action"].lower() and redundant:
+                html += '<div style="margin-top:6px;font-size:12px;color:#475569">\n'
+                for r in redundant[:3]:
+                    html += f'<div style="margin:2px 0">Remove <b>{_esc(r["unused"]["name"])}</b> → you use <b>{_esc(r["active"]["name"])}</b> ({r["reason"]})</div>\n'
+                html += '</div>\n'
+            html += '</div>\n'
+        html += '</div>\n'
+
+    if imm or lt:
+        html += '</div>\n'
+        html += '<div class="detail-section">\n'  # re-open detail section for remaining content
 
     # ── Info ──
     if infos:
