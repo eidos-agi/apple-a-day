@@ -1,0 +1,38 @@
+{% if immediate or longterm %}
+<div style="margin-top:24px">
+
+{% if immediate %}
+<div class="focus-box" style="border-color:#dc2626">
+  <h2 id="actions" style="color:#dc2626;margin:0 0 12px">Immediate Fixes — stop the bleeding</h2>
+  {% for a in immediate %}
+  <div class="focus-item" style="padding:8px 0;border-bottom:1px solid #f1f5f9">
+    <div><b>{{ loop.index }}. {{ a.action }}</b> <span style="color:#94a3b8;font-size:12px">({{ a.effort }})</span></div>
+    <div style="font-size:13px;color:#475569;margin-top:2px">{{ a.impact }}</div>
+    {% if a.cmd %}<div style="margin-top:4px"><span class="action-cmd">{{ a.cmd[:120] }}</span></div>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if longterm %}
+<div class="focus-box" style="border-color:#0284c7">
+  <h2 style="color:#0284c7;margin:0 0 12px">Long-Term Wins — build a healthier system</h2>
+  {% for a in longterm %}
+  <div class="focus-item" style="padding:8px 0;border-bottom:1px solid #f1f5f9">
+    <div><b>{{ loop.index }}. {{ a.action }}</b> <span style="color:#94a3b8;font-size:12px">({{ a.effort }})</span></div>
+    <div style="font-size:13px;color:#475569;margin-top:2px">{{ a.impact }}</div>
+    {% if a.cmd %}<div style="margin-top:4px"><span class="action-cmd">{{ a.cmd[:120] }}</span></div>{% endif %}
+    {% if 'uninstall' in a.action|lower and redundant %}
+    <div style="margin-top:6px;font-size:12px;color:#475569">
+      {% for r in redundant[:3] %}
+      <div style="margin:2px 0">Remove <b>{{ r.unused.name }}</b> → you use <b>{{ r.active.name }}</b> ({{ r.reason }})</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+</div>
+{% endif %}

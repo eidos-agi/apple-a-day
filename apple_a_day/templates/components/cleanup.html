@@ -1,0 +1,21 @@
+{% if stale_apps %}
+<h2 id="cleanup">App Cleanup Analysis</h2>
+<div class="card">
+  <div style="font-size:13px;color:#475569;margin-bottom:8px">Apps plotted by size (impact) vs. time since last use. Top-right quadrant = high impact, rarely used — best removal candidates.</div>
+  {{ scatterplot_svg }}
+  {% if remove_candidates %}
+  <table style="margin-top:12px">
+    <tr><th>App</th><th style="width:200px">Size</th><th>Last Used</th><th>Action</th></tr>
+    {% for a in remove_candidates[:10] %}
+    <tr>
+      <td>{{ a.name }}</td>
+      <td>{{ size_bar(a.size_mb, max_remove_size) }}</td>
+      <td>{{ a.last_used }}</td>
+      <td><span class="action-cmd">sudo rm -rf "/Applications/{{ a.name }}.app"</span></td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+{{ knowledge_card(['orphaned_agent']) }}
+{% endif %}

@@ -1,0 +1,124 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #faf9f6; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 0; margin: 0; font-size: 14px; line-height: 1.5; display: flex; }
+code, .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
+h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+h2 { font-size: 15px; font-weight: 600; color: #475569; margin: 28px 0 12px; border-bottom: 1px solid #e7e5e0; padding-bottom: 6px; }
+
+/* Sidebar */
+.sidebar { position: fixed; left: 0; top: 0; width: 180px; height: 100vh; background: #fff; border-right: 1px solid #e7e5e0; padding: 20px 12px; overflow-y: auto; z-index: 10; }
+.sidebar .logo { font-size: 20px; font-weight: 700; color: #1a3a1a; margin-bottom: 16px; padding: 0 8px; }
+.sidebar nav { font-size: 12px; }
+.sidebar nav a { display: block; padding: 5px 10px; color: #64748b; text-decoration: none; border-radius: 4px; margin: 1px 0; transition: all 0.1s; }
+.sidebar nav a:hover { background: #f0f7f0; color: #1a3a1a; }
+.sidebar nav a.active { background: #1a3a1a; color: #fff; }
+.sidebar nav .nav-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; padding: 10px 10px 3px; }
+
+/* Apple progress */
+.apple-progress { position: fixed; left: 0; bottom: 0; width: 180px; height: 48px; background: #fff; border-top: 1px solid #e7e5e0; border-right: 1px solid #e7e5e0; display: flex; align-items: center; padding: 0 16px; z-index: 11; }
+.apple-track { flex: 1; height: 4px; background: #e7e5e0; border-radius: 2px; position: relative; }
+.apple-dot { position: absolute; top: -10px; font-size: 20px; transition: left 0.15s; }
+
+/* Main content */
+.main { margin-left: 180px; flex: 1; min-width: 0; max-width: 860px; padding: 24px; }
+.layout { display: block; }
+
+/* Level pills */
+.level-pills { display: flex; gap: 0; margin-bottom: 20px; background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; overflow: hidden; }
+.level-pill { flex: 1; padding: 10px 16px; text-align: center; cursor: pointer; font-size: 13px; font-weight: 500; color: #64748b; border-right: 1px solid #e7e5e0; transition: all 0.15s; user-select: none; }
+.level-pill:last-child { border-right: none; }
+.level-pill:hover { background: #f8f7f4; }
+.level-pill.active { background: #1a3a1a; color: #fff; }
+.level-pill .pill-desc { font-size: 11px; font-weight: 400; display: block; margin-top: 1px; }
+.l2 { display: none; }
+.l3 { display: none; }
+
+/* Header */
+.header { background: linear-gradient(135deg, #f0f7f0 0%, #fff 60%); border: 1px solid #d4e5d4; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.header-left h1 { color: #1a3a1a; }
+.header-left h1::before { content: "🍎 "; }
+.header-left .subtitle { color: #64748b; font-size: 13px; margin-top: 4px; }
+
+/* BLUF */
+.bluf { background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+.bluf-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 6px; }
+.bluf-summary { font-size: 15px; line-height: 1.6; }
+.bluf-counts { display: flex; gap: 12px; margin-top: 12px; font-size: 12px; }
+.bluf-count { padding: 3px 12px; border-radius: 4px; font-weight: 600; }
+.bluf-count.crit { background: #fef2f2; color: #dc2626; }
+.bluf-count.warn { background: #fffbeb; color: #92400e; }
+.bluf-count.info { background: #eff6ff; color: #1e40af; }
+
+/* System info */
+.sysinfo { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.sysinfo-item { background: #fff; border: 1px solid #e7e5e0; border-radius: 6px; padding: 12px 16px; text-align: center; }
+.sysinfo-val { font-size: 18px; font-weight: 700; color: #0f172a; font-family: 'SF Mono', monospace; }
+.sysinfo-denom { font-size: 12px; font-weight: 400; color: #94a3b8; }
+.sysinfo-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+.sysinfo-bar { height: 4px; background: #e7e5e0; border-radius: 2px; margin-top: 6px; overflow: hidden; }
+.sysinfo-fill { height: 100%; border-radius: 2px; }
+
+/* Cards */
+.card { background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; padding: 16px 20px; margin: 12px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+
+/* Matrix */
+.matrix-row { display: flex; align-items: center; margin: 6px 0; flex-wrap: nowrap; overflow: hidden; }
+.matrix-label { width: 90px; font-size: 13px; color: #475569; }
+.matrix-val { font-size: 13px; color: #64748b; margin-left: 8px; width: 30px; text-align: right; font-family: 'SF Mono', monospace; }
+.matrix-issue { font-size: 12px; color: #64748b; margin-left: 8px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+th { text-align: left; padding: 8px 12px; color: #475569; font-weight: 600; border-bottom: 2px solid #e7e5e0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+td { padding: 6px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }
+tr:hover { background: #f8f7f4; }
+code { word-break: break-all; }
+.action-cmd { background: #f1f5f9; padding: 2px 8px; border-radius: 3px; font-family: 'SF Mono', monospace; font-size: 11px; color: #334155; display: inline-block; margin-top: 2px; word-break: break-all; }
+
+/* Findings */
+.finding { padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+.finding:last-child { border-bottom: none; }
+.finding-fix { font-size: 13px; color: #475569; margin-top: 6px; padding-left: 16px; border-left: 2px solid #e7e5e0; word-wrap: break-word; overflow-wrap: break-word; }
+
+/* Offenders */
+.offender { display: flex; align-items: center; margin: 6px 0; font-size: 13px; }
+.offender-name { width: 200px; color: #1e293b; font-family: 'SF Mono', monospace; }
+
+/* Focus / actions */
+.focus-box { background: #fff; border: 2px solid #5a9a5a; border-radius: 8px; padding: 20px; margin: 20px 0; }
+.focus-box h2 { border-bottom: none; margin: 0 0 12px; color: #0f172a; font-size: 16px; }
+.focus-item { padding: 6px 0; font-size: 14px; }
+.focus-item .tag { font-weight: 700; }
+.focus-item .tag-fix { color: #dc2626; }
+.focus-item .tag-now { color: #d97706; }
+.focus-item .tag-review { color: #92400e; }
+.focus-item .tag-watch { color: #0284c7; }
+
+/* Sparkline */
+.spark-container { background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; padding: 16px 20px; }
+.spark-stats { display: flex; gap: 24px; margin-top: 8px; font-size: 12px; color: #64748b; font-family: 'SF Mono', monospace; }
+.spark-stats b { color: #1e293b; }
+.spike { background: #fef2f2; border-left: 3px solid #ef4444; padding: 8px 12px; margin: 6px 0; font-size: 13px; border-radius: 0 4px 4px 0; }
+
+/* Knowledge cards */
+.knowledge { background: #f8f7f4; border: 1px solid #e7e5e0; border-radius: 6px; margin: 8px 0; font-size: 13px; }
+.knowledge summary { padding: 8px 12px; cursor: pointer; color: #0284c7; font-weight: 500; }
+.knowledge summary:hover { background: #f1f5f9; }
+.knowledge .k-section { padding: 6px 12px 6px 24px; color: #475569; line-height: 1.6; }
+.knowledge .k-section b { color: #1e293b; }
+
+/* Trade-offs */
+.tradeoff { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 12px 16px; margin: 8px 0; font-size: 13px; }
+.tradeoff-gain { color: #16a34a; }
+.tradeoff-lose { color: #dc2626; }
+
+/* Trend */
+.trend-card { font-size: 15px; }
+.trend-up { color: #16a34a; }
+.trend-down { color: #dc2626; }
+.trend-flat { color: #64748b; }
+
+/* Footer */
+footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e7e5e0; font-size: 11px; color: #94a3b8; text-align: center; }
+
+/* Responsive */
+@media (max-width: 900px) { .sidebar { display: none; } .main { margin-left: 0; } .apple-progress { display: none; } }

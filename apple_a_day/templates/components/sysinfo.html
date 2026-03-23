@@ -1,0 +1,21 @@
+<div class="sysinfo" id="sysinfo">
+  <div class="sysinfo-item">
+    <div class="sysinfo-val">{{ current_load|round(0)|int }} <span class="sysinfo-denom">/ {{ cores }}</span></div>
+    <div class="sysinfo-label">Load / Cores</div>
+    <div class="sysinfo-bar"><div class="sysinfo-fill" style="width:{{ [load_pct, 100]|min }}%;background:{{ load_color }}"></div></div>
+  </div>
+  <div class="sysinfo-item">
+    <div class="sysinfo-val">{{ swap_gb }} <span class="sysinfo-denom">/ {{ ram_gb }} GB</span></div>
+    <div class="sysinfo-label">Swap / RAM</div>
+    <div class="sysinfo-bar"><div class="sysinfo-fill" style="width:{{ [swap_pct, 100]|min }}%;background:{{ swap_color }}"></div></div>
+  </div>
+  <div class="sysinfo-item">
+    <div class="sysinfo-val">{{ disk_used_gb }} <span class="sysinfo-denom">/ {{ disk_total_gb }} GB</span></div>
+    <div class="sysinfo-label">Disk Used</div>
+    <div class="sysinfo-bar"><div class="sysinfo-fill" style="width:{{ disk_pct }}%;background:{{ disk_color }}"></div></div>
+  </div>
+  <div class="sysinfo-item">
+    <div class="sysinfo-val">{{ uptime }}</div>
+    <div class="sysinfo-label">Uptime</div>
+  </div>
+</div>

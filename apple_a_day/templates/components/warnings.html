@@ -1,0 +1,22 @@
+{% if warnings %}
+<h2 id="warnings" style="color:#92400e">Warnings ({{ warnings|length }})</h2>
+<div class="card">
+  {% for w in warnings %}
+  <div class="finding">
+    {{ sev_badge('warning') }} {{ w.summary }}
+    {% if w.fix %}
+    <div class="finding-fix">→ {{ w.fix }}</div>
+    {% endif %}
+    {% set tradeoff = get_tradeoff(w) %}
+    {% if tradeoff %}
+    <div class="tradeoff">
+      <span class="tradeoff-gain">Gain:</span> {{ tradeoff.gain }}<br>
+      <span class="tradeoff-lose">Lose:</span> {{ tradeoff.lose }}
+    </div>
+    {% endif %}
+    {% set topics = match_topics(w.summary, w.check) %}
+    {% if topics %}{{ knowledge_card(topics) }}{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

@@ -1,0 +1,37 @@
+{% if sustained %}
+<h2 id="pressure">Sustained Pressure (long-running load)</h2>
+<div class="card">
+  <div style="font-size:12px;color:#64748b;margin-bottom:8px">Processes consuming CPU across >50% of the monitoring window. These cause crashes, not spikes.</div>
+  <table>
+    <tr><th>Process</th><th style="width:200px">Cumulative CPU</th><th>Avg CPU</th><th>Present</th><th>Pattern</th></tr>
+    {% for o in sustained[:7] %}
+    <tr>
+      <td class="mono">{{ o.name }}</td>
+      <td>{{ bar_html(o.total_cpu, max_sustained_cpu, o.avg_cpu) }}</td>
+      <td class="mono">{{ o.avg_cpu }}%</td>
+      <td>{{ o.presence_pct|round(0)|int }}%</td>
+      <td>{{ mini_sparkline(o.cpu_series) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{{ knowledge_card(['load_average']) }}
+{% endif %}
+
+{% if transient %}
+<h2>Transient Load (spikes)</h2>
+<div class="card">
+  <div style="font-size:12px;color:#64748b;margin-bottom:8px">Processes that appeared briefly at high CPU. Usually normal (builds, scans, syncs).</div>
+  <table>
+    <tr><th>Process</th><th style="width:200px">Peak CPU</th><th>Seen</th><th>Pattern</th></tr>
+    {% for o in transient[:5] %}
+    <tr>
+      <td class="mono">{{ o.name }}</td>
+      <td>{{ bar_html(o.peak_cpu, max_transient_peak, o.peak_cpu) }}</td>
+      <td>{{ o.appearances }}x</td>
+      <td>{{ mini_sparkline(o.cpu_series) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}

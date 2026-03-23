@@ -1,0 +1,11 @@
+{% if infos %}
+<h2>Info ({{ infos|length }})</h2>
+<div class="card">
+  {% for item in infos[:8] %}
+  <div class="finding" style="color:#475569">{{ sev_badge('info') }} {{ item.summary }}</div>
+  {% endfor %}
+  {% if infos|length > 8 %}
+  <div style="color:#64748b;font-size:12px;padding:8px 0">...and {{ infos|length - 8 }} more</div>
+  {% endif %}
+</div>
+{% endif %}

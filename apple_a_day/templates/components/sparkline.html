@@ -1,0 +1,20 @@
+{% if load_values %}
+<h2 id="load">Load History</h2>
+<div class="spark-container">
+  {{ sparkline_svg }}
+  <div class="spark-stats">
+    <span>peak: <b>{{ load_peak|round(0)|int }}</b></span>
+    <span>avg: <b>{{ load_avg|round(1) }}</b></span>
+    <span>cores: <b>{{ cores }}</b></span>
+    <span>samples: <b>{{ load_values|length }}</b></span>
+  </div>
+</div>
+{% for s in spikes[:3] %}
+<div class="spike">
+  ▲ spike peak <b>{{ s.peak_load|round(0)|int }}x</b> —
+  {{ s.top_processes[:3]|map(attribute=1)|join(', ') }}
+  {% if s.ongoing %}<span style="color:#ef4444;font-weight:700">ONGOING</span>{% endif %}
+</div>
+{% endfor %}
+{{ knowledge_card(['load_average']) }}
+{% endif %}

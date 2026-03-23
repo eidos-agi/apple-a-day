@@ -1,0 +1,12 @@
+{% if trend %}
+<h2>Trend</h2>
+<div class="card trend-card">
+  {% if trend == 'improving' %}
+  <span class="trend-up" style="font-size:16px">↑ improving</span>
+  {% elif trend == 'degrading' %}
+  <span class="trend-down" style="font-size:16px">↓ degrading</span>
+  {% else %}
+  <span class="trend-flat" style="font-size:16px">→ stable</span>
+  {% endif %}
+</div>
+{% endif %}

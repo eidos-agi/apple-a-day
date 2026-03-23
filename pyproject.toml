@@ -37,6 +37,7 @@ Changelog = "https://github.com/eidos-agi/apple-a-day/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 rich = ["rich>=13.0"]
+report = ["jinja2>=3.0"]
 mcp = ["mcp[cli]>=1.0"]
 dev = ["pytest", "ruff"]
 

@@ -1,25 +1,29 @@
-"""Render apple-a-day health report as a self-contained HTML file.
+"""Render apple-a-day health report using Jinja2 templates.
 
-Design principles:
-  - BLUF first, details second
-  - Every finding explained in plain english (via knowledge.py)
-  - Trade-off framing: what you gain vs what you lose
-  - Sans-serif for prose, monospace for data
+Templates live in apple_a_day/templates/. This module collects data
+and passes it to the templates — no HTML assembly here.
 """
 
+import glob as _glob
 import os
 import subprocess
 import webbrowser
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
+from jinja2 import Environment, FileSystemLoader
+
+from .app_similarity import find_redundant_apps
+from .checks.cleanup import _find_stale_apps, _get_last_used, _SAFE_APPS
 from .knowledge import TOPICS, match_topics
 from .log import read_recent
 from .runner import run_all_checks
 from .vitals import analyze_vitals, read_vitals
 
+TEMPLATE_DIR = Path(__file__).parent / "templates"
 
-# ── SVG helpers ──
+
+# ── SVG helpers (registered as Jinja2 globals) ──
 
 def _donut_svg(score: int, grade: str, color: str, size: int = 130) -> str:
     r = size // 2 - 10
@@ -57,10 +61,9 @@ def _sparkline_svg(values: list[float], width: int = 500, height: int = 60) -> s
         return ""
     mn, mx = min(values), max(values)
     rng = mx - mn if mx != mn else 1
-    max_points = 80
-    if len(values) > max_points:
-        step = len(values) / max_points
-        values = [values[int(i * step)] for i in range(max_points)]
+    if len(values) > 80:
+        step = len(values) / 80
+        values = [values[int(i * step)] for i in range(80)]
     points = []
     for i, v in enumerate(values):
         x = i / max(len(values) - 1, 1) * width
@@ -74,290 +77,7 @@ def _sparkline_svg(values: list[float], width: int = 500, height: int = 60) -> s
             f'</svg>')
 
 
-def _offender_bar(appearances: int, max_app: int, peak_cpu: float) -> str:
-    w = int(appearances / max(max_app, 1) * 150)
-    color = "#ef4444" if peak_cpu > 80 else "#ca8a04" if peak_cpu > 30 else "#0284c7"
-    return (f'<div style="display:inline-block;width:{w}px;height:14px;'
-            f'background:{color};border-radius:2px;vertical-align:middle"></div>'
-            f' <span style="color:#64748b;font-size:12px">{appearances}x · peak {peak_cpu}%</span>')
-
-
-def _sev_badge(severity: str) -> str:
-    colors = {
-        "critical": ("#ef4444", "#fff"),
-        "warning": ("#ca8a04", "#fff"),
-        "info": ("#3b82f6", "#fff"),
-        "ok": ("#22c55e", "#fff"),
-    }
-    bg, fg = colors.get(severity, ("#64748b", "#fff"))
-    return (f'<span style="background:{bg};color:{fg};'
-            f'padding:1px 8px;border-radius:3px;font-size:11px;font-weight:600;'
-            f'text-transform:uppercase">{severity}</span>')
-
-
-def _knowledge_card(topic_keys: list[str]) -> str:
-    """Render expandable knowledge cards for matched topics."""
-    if not topic_keys:
-        return ""
-    html = ""
-    seen = set()
-    for key in topic_keys:
-        if key in seen:
-            continue
-        seen.add(key)
-        topic = TOPICS.get(key)
-        if not topic:
-            continue
-        title = key.replace("_", " ").title()
-        html += (
-            f'<details class="knowledge">'
-            f'<summary>{title} — what is this?</summary>'
-            f'<div class="k-section"><b>What:</b> {_esc(topic["what"])}</div>'
-            f'<div class="k-section"><b>Why it matters:</b> {_esc(topic["why"])}</div>'
-            f'<div class="k-section"><b>How to fix:</b><br>{_esc(topic["fix"]).replace(chr(10), "<br>")}</div>'
-            f'</details>'
-        )
-    return html
-
-
-def _cleanup_scatterplot(stale_apps: list[dict], width: int = 780, height: int = 320) -> str:
-    """SVG scatterplot: X = days since last use, Y = app size (impact).
-
-    Quadrants:
-      Top-right: big + unused → REMOVE
-      Top-left: big + used recently → KEEP (but watch)
-      Bottom-right: small + unused → low priority
-      Bottom-left: small + used → fine
-    """
-    if not stale_apps:
-        return ""
-
-    pad_l, pad_r, pad_t, pad_b = 60, 20, 20, 40
-    plot_w = width - pad_l - pad_r
-    plot_h = height - pad_t - pad_b
-
-    max_days = max(a.get("days_ago", 1) for a in stale_apps)
-    max_days = min(max_days, 365)  # cap at 1 year
-    max_size = max(a.get("size_mb", 1) for a in stale_apps)
-    if max_size < 100:
-        max_size = 100
-
-    svg = f'<svg width="{width}" height="{height}" style="display:block;margin:8px 0">\n'
-
-    # Background quadrants
-    mid_x = pad_l + plot_w * 0.5
-    mid_y = pad_t + plot_h * 0.5
-    # Top-right: suggest removal (red tint)
-    svg += f'<rect x="{mid_x}" y="{pad_t}" width="{plot_w * 0.5}" height="{plot_h * 0.5}" fill="rgba(239,68,68,0.05)" rx="4"/>\n'
-    # Quadrant labels
-    svg += f'<text x="{mid_x + plot_w * 0.25}" y="{pad_t + 16}" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">Suggest Removal</text>\n'
-    svg += f'<text x="{pad_l + plot_w * 0.25}" y="{pad_t + 16}" text-anchor="middle" font-size="11" fill="#64748b">Keep (watch size)</text>\n'
-    svg += f'<text x="{mid_x + plot_w * 0.25}" y="{pad_t + plot_h - 4}" text-anchor="middle" font-size="11" fill="#64748b">Low priority</text>\n'
-    svg += f'<text x="{pad_l + plot_w * 0.25}" y="{pad_t + plot_h - 4}" text-anchor="middle" font-size="11" fill="#22c55e">Fine</text>\n'
-
-    # Grid lines
-    svg += f'<line x1="{mid_x}" y1="{pad_t}" x2="{mid_x}" y2="{pad_t + plot_h}" stroke="#e2e8f0" stroke-dasharray="4"/>\n'
-    svg += f'<line x1="{pad_l}" y1="{mid_y}" x2="{pad_l + plot_w}" y2="{mid_y}" stroke="#e2e8f0" stroke-dasharray="4"/>\n'
-
-    # Axes
-    svg += f'<line x1="{pad_l}" y1="{pad_t + plot_h}" x2="{pad_l + plot_w}" y2="{pad_t + plot_h}" stroke="#94a3b8"/>\n'
-    svg += f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t + plot_h}" stroke="#94a3b8"/>\n'
-
-    # Axis labels
-    svg += f'<text x="{pad_l + plot_w // 2}" y="{height - 4}" text-anchor="middle" font-size="12" fill="#64748b">Days since last use →</text>\n'
-    svg += f'<text x="14" y="{pad_t + plot_h // 2}" text-anchor="middle" font-size="12" fill="#64748b" transform="rotate(-90 14 {pad_t + plot_h // 2})">Size (MB) →</text>\n'
-
-    # Tick labels
-    svg += f'<text x="{pad_l}" y="{height - 22}" text-anchor="middle" font-size="10" fill="#94a3b8">30d</text>\n'
-    svg += f'<text x="{pad_l + plot_w}" y="{height - 22}" text-anchor="middle" font-size="10" fill="#94a3b8">{max_days}d</text>\n'
-    svg += f'<text x="{pad_l - 6}" y="{pad_t + plot_h + 4}" text-anchor="end" font-size="10" fill="#94a3b8">0</text>\n'
-    svg += f'<text x="{pad_l - 6}" y="{pad_t + 4}" text-anchor="end" font-size="10" fill="#94a3b8">{max_size}MB</text>\n'
-
-    # Data points
-    for app in stale_apps:
-        days = min(app.get("days_ago", 30), max_days)
-        size = min(app.get("size_mb", 0), max_size)
-        x = pad_l + (days - 30) / max(max_days - 30, 1) * plot_w
-        y = pad_t + plot_h - (size / max_size * plot_h)
-
-        # Color by quadrant position
-        in_remove_quadrant = days > max_days * 0.5 and size > max_size * 0.3
-        color = "#ef4444" if in_remove_quadrant else "#0284c7"
-        r = max(4, min(12, size / max_size * 15 + 3))
-
-        name = _esc(app["name"])
-        size_label = f"{size}MB" if size < 1024 else f"{size / 1024:.1f}GB"
-        svg += (f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{r:.0f}" fill="{color}" opacity="0.7">'
-                f'<title>{name} — {size_label}, {app.get("last_used", "?")}</title></circle>\n')
-
-        # Label large or notable apps
-        if size > max_size * 0.15 or in_remove_quadrant:
-            svg += f'<text x="{x + r + 3:.0f}" y="{y + 4:.0f}" font-size="10" fill="#475569">{name[:20]}</text>\n'
-
-    svg += '</svg>'
-    return svg
-
-
-def _get_live_process_tables() -> tuple[list[dict], list[dict]]:
-    """Get current top CPU and memory consumers with full command lines."""
-    cpu_hogs = []
-    mem_hogs = []
-
-    # Get full command lines for all PIDs in one shot
-    cmdlines: dict[str, str] = {}
-    try:
-        out = subprocess.run(["ps", "-eo", "pid,args"],
-                             capture_output=True, text=True, timeout=5)
-        if out.returncode == 0:
-            for line in out.stdout.strip().split("\n")[1:]:
-                parts = line.strip().split(None, 1)
-                if len(parts) == 2:
-                    cmdlines[parts[0]] = parts[1]
-    except (subprocess.TimeoutExpired, OSError):
-        pass
-
-    try:
-        # CPU sorted
-        out = subprocess.run(["ps", "-eo", "pid,pcpu,pmem,comm", "-r"],
-                             capture_output=True, text=True, timeout=5)
-        if out.returncode == 0:
-            for line in out.stdout.strip().split("\n")[1:15]:
-                parts = line.split(None, 3)
-                if len(parts) < 4:
-                    continue
-                pid, cpu, mem, comm = parts
-                cpu_val = float(cpu)
-                if cpu_val < 5:
-                    break
-                name = comm.rsplit("/", 1)[-1]
-                cpu_hogs.append({"pid": pid, "cpu": cpu, "mem": mem, "name": name,
-                                 "cmdline": cmdlines.get(pid, "")})
-
-        # Memory sorted
-        out = subprocess.run(["ps", "-eo", "pid,pcpu,pmem,comm", "-m"],
-                             capture_output=True, text=True, timeout=5)
-        if out.returncode == 0:
-            for line in out.stdout.strip().split("\n")[1:15]:
-                parts = line.split(None, 3)
-                if len(parts) < 4:
-                    continue
-                pid, cpu, mem, comm = parts
-                mem_val = float(mem)
-                if mem_val < 1.0:
-                    break
-                name = comm.rsplit("/", 1)[-1]
-                mem_hogs.append({"pid": pid, "cpu": cpu, "mem": mem, "name": name,
-                                 "cmdline": cmdlines.get(pid, "")})
-    except (subprocess.TimeoutExpired, OSError):
-        pass
-    return cpu_hogs, mem_hogs
-
-
-def _process_action(name: str, cmdline: str = "") -> str:
-    """Suggest what to do about a resource-heavy process, using its full command line."""
-    # System processes — specific advice, no kill command
-    system = {
-        "WindowServer": "System process — cannot be killed. Reduce windows/displays.",
-        "kernel_task": "Thermal management — reduce workload, check ventilation.",
-        "mds_stores": "Spotlight indexing — wait, or exclude folders in System Settings → Siri & Spotlight.",
-        "mds": "Spotlight indexing — transient.",
-        "fileproviderd": "Cloud sync (OneDrive/iCloud) — pause sync or reduce sync folders.",
-        "trustd": "Certificate validation — transient, resolves after sync completes.",
-        "XprotectService": "Security scan — transient, let it finish.",
-        "mediaanalysisd": "Photo/video analysis — transient background task.",
-        "bird": "iCloud sync daemon — pause iCloud or wait.",
-        "launchd": "System init — cannot be killed.",
-    }
-    if name in system:
-        return system[name]
-
-    # Known third-party — specific advice
-    third_party = {
-        "OneDrive": "Pause in menu bar or reduce sync scope.",
-        "Dropbox": "Pause in menu bar.",
-        "Docker Desktop": "Check resource limits: Docker Desktop → Settings → Resources.",
-        "prl_client_app": "Parallels VM — suspend or shut down the VM.",
-    }
-    for key, advice in third_party.items():
-        if key.lower() in name.lower():
-            return advice
-
-    # Use command line to identify what the process is actually doing
-    if cmdline:
-        identity = _identify_from_cmdline(cmdline, name)
-        if identity:
-            return identity
-
-    return f'<span class="action-cmd">kill {name}: kill -15 $(pgrep -f "{_esc(name)}")</span>'
-
-
-def _identify_from_cmdline(cmdline: str, name: str) -> str:
-    """Parse a command line and return a human-readable description + action."""
-    cl = cmdline.lower()
-
-    # Python processes — identify the script/module
-    if "python" in name.lower():
-        # uvicorn / gunicorn / fastapi
-        if "uvicorn" in cl:
-            module = cmdline.split("uvicorn")[-1].strip().split()[0] if "uvicorn" in cmdline else "?"
-            return f'Web server: <code>{_esc(module)}</code> — <span class="action-cmd">kill -15 {name}</span>'
-        # python -m module
-        if " -m " in cmdline:
-            module = cmdline.split(" -m ")[-1].strip().split()[0]
-            return f'Module: <code>{_esc(module)}</code> — <span class="action-cmd">kill -15 {name}</span>'
-        # python script.py
-        for part in cmdline.split():
-            if part.endswith(".py"):
-                script = part.rsplit("/", 1)[-1]
-                return f'Script: <code>{_esc(script)}</code> — <span class="action-cmd">kill -15 {name}</span>'
-        # pip install
-        if "pip" in cl:
-            return f'pip operation — wait for it to finish.'
-
-    # Node processes
-    if "node" in name.lower():
-        if "next" in cl:
-            return 'Next.js dev server — <span class="action-cmd">kill -15 {}</span>'.format(name)
-        if "vite" in cl:
-            return 'Vite dev server — <span class="action-cmd">kill -15 {}</span>'.format(name)
-        if "tsx" in cl or "ts-node" in cl:
-            for part in cmdline.split():
-                if part.endswith(".ts") or part.endswith(".tsx"):
-                    script = part.rsplit("/", 1)[-1]
-                    return f'TypeScript: <code>{_esc(script)}</code>'
-        for part in cmdline.split():
-            if part.endswith(".js"):
-                script = part.rsplit("/", 1)[-1]
-                return f'Script: <code>{_esc(script)}</code>'
-
-    # Ruby
-    if "ruby" in name.lower():
-        if "rails" in cl:
-            return 'Rails server'
-        if "puma" in cl:
-            return 'Puma web server'
-
-    # Claude / AI tools
-    if "claude" in cl:
-        return 'Claude Code session'
-
-    # Launchd services (run-daemon.sh, run-server.sh)
-    if "run-daemon" in cl or "run-server" in cl:
-        # Extract the directory to identify the service
-        for part in cmdline.split():
-            if "/" in part and ("run-daemon" in part or "run-server" in part):
-                service = part.split("/")[-3] if part.count("/") >= 3 else part.rsplit("/", 1)[-1]
-                return f'Daemon: <code>{_esc(service)}</code> — <span class="action-cmd">launchctl list | grep {_esc(service)}</span>'
-
-    # Generic: show truncated command line so the user can at least see what it is
-    short_cmd = cmdline[:80]
-    if len(cmdline) > 80:
-        short_cmd += "..."
-    return f'<code style="font-size:11px;color:#475569">{_esc(short_cmd)}</code>'
-
-
 def _mini_sparkline(values: list[float], width: int = 80, height: int = 16) -> str:
-    """Tiny inline SVG sparkline for a process CPU history."""
     if not values or len(values) < 2:
         return '<span style="color:#94a3b8">—</span>'
     mn, mx = min(values), max(values)
@@ -372,36 +92,220 @@ def _mini_sparkline(values: list[float], width: int = 80, height: int = 16) -> s
             f'</svg>')
 
 
+
+def _cpu_bar(cpu_str: str, max_cpu: float) -> str:
+    cpu = float(cpu_str)
+    bar_w = int(cpu / max(max_cpu, 1) * 140)
+    color = "#ef4444" if cpu > 50 else "#ca8a04" if cpu > 20 else "#0284c7"
+    return (f'<div style="display:flex;align-items:center;gap:6px">'
+            f'<div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div>'
+            f'<span class="mono">{cpu_str}%</span></div>')
+
+
+def _mem_bar(mem_str: str, max_mem: float, ram_gb: int) -> str:
+    mem_pct = float(mem_str)
+    mem_gb = round(mem_pct / 100 * ram_gb, 1)
+    bar_w = int(mem_pct / max(max_mem, 1) * 140)
+    color = "#ef4444" if mem_pct > 10 else "#ca8a04" if mem_pct > 5 else "#0284c7"
+    return (f'<div style="display:flex;align-items:center;gap:6px">'
+            f'<div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div>'
+            f'<span class="mono">{mem_gb} GB</span></div>')
+
+
+def _mem_gb(mem_str: str, ram_gb: int) -> str:
+    return str(round(float(mem_str) / 100 * ram_gb, 1))
+
+
+def _size_bar(size_mb: int, max_size: int) -> str:
+    bar_w = int(size_mb / max(max_size, 1) * 140)
+    size_str = f"{size_mb} MB" if size_mb < 1024 else f"{size_mb / 1024:.1f} GB"
+    color = "#ef4444" if size_mb > 500 else "#ca8a04" if size_mb > 100 else "#0284c7"
+    return (f'<div style="display:flex;align-items:center;gap:6px">'
+            f'<div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div>'
+            f'<span class="mono">{size_str}</span></div>')
+
+
+def _bar_html(value: float, max_val: float, threshold: float) -> str:
+    bar_w = int(value / max(max_val, 1) * 140)
+    color = "#ef4444" if threshold > 30 else "#ca8a04" if threshold > 10 else "#0284c7"
+    return (f'<div style="display:flex;align-items:center;gap:6px">'
+            f'<div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div>'
+            f'<span class="mono">{value:.0f}%·s</span></div>')
+
+
+def _sev_badge(severity: str) -> str:
+    colors = {"critical": ("#ef4444", "#fff"), "warning": ("#ca8a04", "#fff"),
+              "info": ("#3b82f6", "#fff"), "ok": ("#22c55e", "#fff")}
+    bg, fg = colors.get(severity, ("#64748b", "#fff"))
+    return (f'<span style="background:{bg};color:{fg};padding:1px 8px;border-radius:3px;'
+            f'font-size:11px;font-weight:600;text-transform:uppercase">{severity}</span>')
+
+
+def _knowledge_card(topic_keys: list[str]) -> str:
+    html = ""
+    for key in topic_keys:
+        topic = TOPICS.get(key)
+        if not topic:
+            continue
+        title = key.replace("_", " ").title()
+        html += (f'<details class="knowledge"><summary>{title} — what is this?</summary>'
+                 f'<div class="k-section"><b>What:</b> {topic["what"]}</div>'
+                 f'<div class="k-section"><b>Why it matters:</b> {topic["why"]}</div>'
+                 f'<div class="k-section"><b>How to fix:</b><br>{topic["fix"].replace(chr(10), "<br>")}</div>'
+                 f'</details>')
+    return html
+
+
+# ── Process identification ──
+
+def _process_action(name: str, cmdline: str = "") -> str:
+    system = {
+        "WindowServer": "System — reduce windows/displays",
+        "kernel_task": "Thermal management — reduce workload",
+        "mds_stores": "Spotlight indexing — wait or exclude folders",
+        "mds": "Spotlight — transient",
+        "fileproviderd": "Cloud sync — pause OneDrive/iCloud",
+        "trustd": "Certificate validation — transient",
+        "XprotectService": "Security scan — transient",
+        "mediaanalysisd": "Photo analysis — transient",
+        "bird": "iCloud sync — transient",
+        "launchd": "System init — cannot be killed",
+    }
+    if name in system:
+        return system[name]
+    third_party = {"OneDrive": "Pause sync", "Dropbox": "Pause sync",
+                   "Docker Desktop": "Check resource limits", "prl_client_app": "Suspend VM"}
+    for key, advice in third_party.items():
+        if key.lower() in name.lower():
+            return advice
+    if cmdline:
+        return _identify_from_cmdline(cmdline)
+    return f'<span class="action-cmd">kill -15 $(pgrep -f "{name}")</span>'
+
+
+def _identify_from_cmdline(cmdline: str) -> str:
+    parts = cmdline.split()
+    binary = parts[0].rsplit("/", 1)[-1] if parts else "?"
+    if "python" in binary.lower():
+        if "uvicorn" in cmdline or "gunicorn" in cmdline:
+            for i, p in enumerate(parts):
+                if "uvicorn" in p or "gunicorn" in p:
+                    app = parts[i + 1].split(":")[0] if i + 1 < len(parts) else "?"
+                    return f'Web server: <code>{app}</code>'
+        if " -m " in cmdline:
+            module = cmdline.split(" -m ")[-1].strip().split()[0]
+            return f'Module: <code>{module}</code>'
+        for p in parts[1:]:
+            if p.startswith("-"):
+                continue
+            if "/bin/" in p and not p.rsplit("/", 1)[-1].startswith("python"):
+                return f'<code>{p.rsplit("/", 1)[-1]}</code>'
+            if p.endswith(".py"):
+                path_parts = p.rsplit("/", 2)
+                script = path_parts[-1].replace(".py", "")
+                parent = path_parts[-2] if len(path_parts) >= 2 else ""
+                return f'Script: <code>{parent}/{script}</code>' if parent else f'Script: <code>{script}</code>'
+            break
+    if "node" in binary.lower():
+        for p in parts[1:]:
+            if p.endswith(".js") or p.endswith(".ts"):
+                return f'<code>{p.rsplit("/", 1)[-1]}</code>'
+    if "claude" in cmdline.lower():
+        return "Claude Code session"
+    if "run-daemon" in cmdline or "run-server" in cmdline:
+        for p in parts:
+            if "run-daemon" in p or "run-server" in p:
+                service = p.split("/")[-3] if p.count("/") >= 3 else p.rsplit("/", 1)[-1]
+                return f'Daemon: <code>{service}</code>'
+    short = cmdline[:80] + ("..." if len(cmdline) > 80 else "")
+    return f'<code style="font-size:11px;color:#475569">{short}</code>'
+
+
 def _is_daemon(cmdline: str) -> bool:
-    """Detect if a process is a background daemon/service vs a user-facing app."""
     cl = cmdline.lower()
-    daemon_signals = [
-        "launchd", "daemon", "run-server", "run-daemon", "uvicorn", "gunicorn",
-        "celery", "worker", "cron", "/usr/sbin/", "/usr/libexec/",
-        "com.apple.", "com.reeves.", "com.tosh.", "com.eidos", "com.helios",
-        "-m ", "python3 -",  # scripts run as modules
-    ]
-    app_signals = [
-        "/Applications/", ".app/Contents/MacOS/", "Electron", "iTerm",
-        "Chrome", "Safari", "Firefox", "Cursor", "Xcode",
-    ]
+    app_signals = ["/Applications/", ".app/Contents/MacOS/", "Electron", "iTerm", "Chrome", "Safari", "Firefox", "Cursor", "Xcode"]
     for sig in app_signals:
         if sig.lower() in cl:
             return False
+    daemon_signals = ["launchd", "daemon", "run-server", "run-daemon", "uvicorn", "gunicorn", "celery", "worker",
+                      "/usr/sbin/", "/usr/libexec/", "com.apple.", "com.reeves.", "com.tosh.", "com.eidos", "-m ", "python3 -"]
     for sig in daemon_signals:
         if sig in cl:
             return True
-    # If it's in /usr/local, /opt/homebrew, or a repos directory, likely a daemon/script
     if any(p in cl for p in ["/repos-", "/opt/homebrew/", "/.local/", "/.venv/"]):
         return True
     return False
 
 
-def _esc(text: str) -> str:
-    return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+def _get_live_process_tables() -> tuple[list[dict], list[dict]]:
+    cpu_hogs, mem_hogs = [], []
+    cmdlines: dict[str, str] = {}
+    try:
+        out = subprocess.run(["ps", "-eo", "pid,args"], capture_output=True, text=True, timeout=5)
+        if out.returncode == 0:
+            for line in out.stdout.strip().split("\n")[1:]:
+                parts = line.strip().split(None, 1)
+                if len(parts) == 2:
+                    cmdlines[parts[0]] = parts[1]
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+    try:
+        out = subprocess.run(["ps", "-eo", "pid,pcpu,pmem,comm", "-r"], capture_output=True, text=True, timeout=5)
+        if out.returncode == 0:
+            for line in out.stdout.strip().split("\n")[1:15]:
+                parts = line.split(None, 3)
+                if len(parts) < 4:
+                    continue
+                pid, cpu, mem, comm = parts
+                if float(cpu) < 5:
+                    break
+                cpu_hogs.append({"pid": pid, "cpu": cpu, "mem": mem, "name": comm.rsplit("/", 1)[-1], "cmdline": cmdlines.get(pid, "")})
+        out = subprocess.run(["ps", "-eo", "pid,pcpu,pmem,comm", "-m"], capture_output=True, text=True, timeout=5)
+        if out.returncode == 0:
+            for line in out.stdout.strip().split("\n")[1:15]:
+                parts = line.split(None, 3)
+                if len(parts) < 4:
+                    continue
+                pid, cpu, mem, comm = parts
+                if float(mem) < 1.0:
+                    break
+                mem_hogs.append({"pid": pid, "cpu": cpu, "mem": mem, "name": comm.rsplit("/", 1)[-1], "cmdline": cmdlines.get(pid, "")})
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+    return cpu_hogs, mem_hogs
 
 
-# ── Uptime helper ──
+_TRADEOFF_MAP = {
+    "swap": {"gain": "Faster app switching, no more random freezes, reduced SSD wear",
+             "lose": "Need to close some apps or reboot — temporary disruption"},
+    "disk": {"gain": "Faster writes, swap can grow when needed, macOS updates work again",
+             "lose": "Time spent cleaning up files"},
+    "orphaned": {"gain": "Fewer wasted process spawns, cleaner launchd, less log noise",
+                 "lose": "Nothing — these agents serve no purpose, their app is already gone"},
+    "outdated": {"gain": "Security patches, bug fixes, compatibility with newer tools",
+                 "lose": "Possible breaking changes — review changelogs before upgrading all at once"},
+    "crash-loop": {"gain": "CPU freed from restart cycles, fewer kernel panic triggers",
+                   "lose": "The service stops running — check if anything depends on it first"},
+}
+
+
+def _get_tradeoff_fn(finding: dict) -> dict | None:
+    summary = finding.get("summary", "").lower()
+    check = finding.get("check", "").lower()
+    if "swap" in summary:
+        return _TRADEOFF_MAP["swap"]
+    if "disk" in check and ("full" in summary or "free" in summary):
+        return _TRADEOFF_MAP["disk"]
+    if "orphaned" in summary:
+        return _TRADEOFF_MAP["orphaned"]
+    if "outdated" in summary and "homebrew" in check:
+        return _TRADEOFF_MAP["outdated"]
+    if "crash-looping" in summary or "crash loop" in summary:
+        return _TRADEOFF_MAP["crash-loop"]
+    return None
+
+
+# ── Uptime ──
 
 def _get_uptime() -> str:
     try:
@@ -410,14 +314,12 @@ def _get_uptime() -> str:
         uptime_sec = int(datetime.now().timestamp()) - boot_sec
         days = uptime_sec // 86400
         hours = (uptime_sec % 86400) // 3600
-        if days > 0:
-            return f"{days}d {hours}h"
-        return f"{hours}h {(uptime_sec % 3600) // 60}m"
+        return f"{days}d {hours}h" if days > 0 else f"{hours}h {(uptime_sec % 3600) // 60}m"
     except Exception:
         return "?"
 
 
-# ── BLUF generator ──
+# ── BLUF ──
 
 def _generate_bluf(criticals, warnings, infos, spikes) -> str:
     if not criticals and not warnings:
@@ -434,7 +336,7 @@ def _generate_bluf(criticals, warnings, infos, spikes) -> str:
             "Crash Loops": f"{top_count} process(es) crash-looping — burning CPU on restart cycles",
             "CPU Load": "Sustained high CPU load is causing system-wide slowdowns",
             "Thermal": "Your Mac is thermally throttled — running at reduced speed to prevent heat damage",
-            "Shutdown Causes": f"{top_count} abnormal shutdown(s) detected — your Mac is not shutting down cleanly",
+            "Shutdown Causes": f"{top_count} abnormal shutdown(s) detected",
             "Memory Pressure": "Your Mac is under heavy memory pressure, swapping to SSD",
             "Disk Health": "Disk space critically low — macOS needs free space for swap, caches, and updates",
         }
@@ -447,761 +349,284 @@ def _generate_bluf(criticals, warnings, infos, spikes) -> str:
             parts.append(f"{len(warnings)} warning(s) in {warn_checks.pop()}")
         else:
             parts.append(f"{len(warnings)} warning(s) across {len(warn_checks)} areas")
-    if spikes:
-        ongoing = [s for s in spikes if s.get("ongoing")]
-        if ongoing:
-            parts.append("a load spike is happening right now")
+    if spikes and any(s.get("ongoing") for s in spikes):
+        parts.append("a load spike is happening right now")
     return ". ".join(parts) + "." if parts else "Review the findings below."
 
 
 # ── Score matrix ──
 
 def _compute_matrix(report) -> dict:
-    dimension_checks = {
+    dim_checks = {
         "stability": ["Crash Loops", "Kernel Panics", "Shutdown Causes"],
         "cpu": ["CPU Load"], "thermal": ["Thermal"], "memory": ["Memory Pressure"],
         "storage": ["Disk Health"], "services": ["Launch Agents"],
-        "security": ["Security"], "infra": ["Dynamic Library Health", "Homebrew"],
-        "network": ["Network"],
+        "security": ["Security"], "infra": ["Dynamic Library Health", "Homebrew"], "network": ["Network"],
     }
-    weights = {
-        "stability": 3, "cpu": 3, "memory": 2, "thermal": 2,
-        "storage": 2, "services": 2, "security": 1, "infra": 1, "network": 1,
-    }
+    weights = {"stability": 3, "cpu": 3, "memory": 2, "thermal": 2, "storage": 2, "services": 2, "security": 1, "infra": 1, "network": 1}
     check_scores = {}
     for r in report.results:
         score = 100
         for f in r.findings:
             s = f.severity.value
-            if s == "critical":
-                score = min(score, 0)
-            elif s == "warning":
-                score = min(score, 50)
-            elif s == "info":
-                score = min(score, 80)
+            if s == "critical": score = min(score, 0)
+            elif s == "warning": score = min(score, 50)
+            elif s == "info": score = min(score, 80)
         check_scores[r.name] = score
     matrix = {}
-    for dim, checks in dimension_checks.items():
+    for dim, checks in dim_checks.items():
         scores = [check_scores.get(c, 100) for c in checks]
         matrix[dim] = min(scores) if scores else 100
     weighted_sum = sum(matrix.get(d, 100) * w for d, w in weights.items())
-    total_weight = sum(weights.values())
-    overall = round(weighted_sum / total_weight)
+    overall = round(weighted_sum / sum(weights.values()))
     grade = "A" if overall >= 90 else "B" if overall >= 75 else "C" if overall >= 50 else "D" if overall >= 25 else "F"
-    matrix["_overall"] = overall
-    matrix["_grade"] = grade
-    return matrix
+    return {**matrix, "_overall": overall, "_grade": grade}
 
+
+# ── Action plan ──
 
 def _build_action_plan(criticals, warnings, spikes, offenders, stale_apps, redundant_apps) -> dict:
-    """Build an impact-scored action plan split into immediate fixes and long-term wins.
-
-    Each action has: description, impact estimate, effort, command, and category.
-    """
-    immediate = []  # Fix now — actively causing harm
-    longterm = []   # Fix when you have time — improves health over time
-
-    # ── Immediate: crash-looping services ──
+    immediate, longterm = [], []
     for item in criticals:
         if "crash-looping" in item["summary"].lower() or "crash loop" in item["summary"].lower():
-            immediate.append({
-                "action": f"Stop crash loop: {item['summary'].split(':')[0] if ':' in item['summary'] else item['summary'][:50]}",
-                "impact": "Frees CPU from restart cycles, reduces kernel panic risk",
-                "effort": "1 min",
-                "cmd": item.get("fix", ""),
-            })
-
-    # ── Immediate: active load spikes ──
-    if spikes:
-        ongoing = [s for s in spikes if s.get("ongoing")]
-        if ongoing:
-            procs = ", ".join(p[1] for p in ongoing[0].get("top_processes", [])[:3])
-            immediate.append({
-                "action": f"Address active load spike (peak {ongoing[0]['peak_load']:.0f}x cores)",
-                "impact": f"System is overloaded right now — {procs} are the culprits",
-                "effort": "5 min",
-                "cmd": "",
-            })
-
-    # ── Immediate: sustained pressure offenders ──
+            immediate.append({"action": f"Stop crash loop: {item['summary'][:50]}", "impact": "Frees CPU from restart cycles", "effort": "1 min", "cmd": item.get("fix", "")})
+    if spikes and any(s.get("ongoing") for s in spikes):
+        s = next(s for s in spikes if s.get("ongoing"))
+        procs = ", ".join(p[1] for p in s.get("top_processes", [])[:3])
+        immediate.append({"action": f"Active load spike (peak {s['peak_load']:.0f}x)", "impact": f"Culprits: {procs}", "effort": "5 min", "cmd": ""})
     sustained = [o for o in offenders if o.get("sustained")]
     for o in sustained[:2]:
-        if o["name"] not in str(immediate):  # avoid duplicating crash loop entries
-            immediate.append({
-                "action": f"Investigate {o['name']} — sustained {o['avg_cpu']}% CPU across {o['presence_pct']:.0f}% of monitoring",
-                "impact": f"Cumulative load of {o['total_cpu']:.0f} CPU-seconds, ongoing system strain",
-                "effort": "10 min",
-                "cmd": "",
-            })
-
-    # ── Immediate: critical kernel panics (if pattern is clear) ──
-    panic_items = [c for c in criticals if c["check"] == "Kernel Panics"]
-    if len(panic_items) >= 5:
-        immediate.append({
-            "action": f"Resolve kernel panic pattern — {len(panic_items)} panics, likely caused by CPU starvation",
-            "impact": "Mac will keep crashing until root cause is fixed",
-            "effort": "30 min investigation",
-            "cmd": "aad checkup -c kernel_panics -c cpu_load -c launch_agents --json",
-        })
-
-    # ── Immediate: high swap ──
-    swap_warning = next((w for w in warnings if "swap" in w["summary"].lower()), None)
-    if swap_warning:
-        immediate.append({
-            "action": "Reduce memory pressure — find and close the biggest memory consumers",
-            "impact": "Mac is using SSD as RAM overflow, slowing everything down",
-            "effort": "5 min",
-            "cmd": "See Memory Hogs table below",
-        })
-
-    # ── Long-term: orphaned launch agents ──
-    orphan_warnings = [w for w in warnings if "orphaned" in w["summary"].lower()]
-    if orphan_warnings:
-        longterm.append({
-            "action": f"Remove {sum(int(w['summary'].split()[0]) for w in orphan_warnings if w['summary'][0].isdigit())} orphaned launch agent(s)",
-            "impact": "Eliminates wasted process spawns and log noise",
-            "effort": "5 min",
-            "cmd": orphan_warnings[0].get("fix", ""),
-        })
-
-    # ── Long-term: unused apps with alternatives ──
+        immediate.append({"action": f"Investigate {o['name']} — {o['avg_cpu']}% avg CPU", "impact": f"Sustained strain: {o['total_cpu']:.0f} cumulative CPU-seconds", "effort": "10 min", "cmd": ""})
+    panics = [c for c in criticals if c["check"] == "Kernel Panics"]
+    if len(panics) >= 5:
+        immediate.append({"action": f"Resolve kernel panic pattern ({len(panics)} panics)", "impact": "Mac will keep crashing until fixed", "effort": "30 min", "cmd": "aad checkup -c kernel_panics -c cpu_load --json"})
+    if any("swap" in w["summary"].lower() for w in warnings):
+        immediate.append({"action": "Reduce memory pressure", "impact": "Mac is using SSD as RAM, slowing everything", "effort": "5 min", "cmd": "See Memory Hogs table"})
+    orphans = [w for w in warnings if "orphaned" in w["summary"].lower()]
+    if orphans:
+        longterm.append({"action": "Remove orphaned launch agents", "impact": "Eliminates wasted process spawns", "effort": "5 min", "cmd": orphans[0].get("fix", "")})
     if redundant_apps:
         names = [r["unused"]["name"] for r in redundant_apps[:3]]
-        longterm.append({
-            "action": f"Uninstall {len(redundant_apps)} app(s) you've replaced: {', '.join(names)}",
-            "impact": "Reclaim disk space, reduce background processes and login items",
-            "effort": "10 min",
-            "cmd": "See Safe to Remove table below",
-        })
+        longterm.append({"action": f"Uninstall {len(redundant_apps)} replaced app(s): {', '.join(names)}", "impact": "Reclaim disk, reduce background processes", "effort": "10 min", "cmd": ""})
     elif stale_apps:
-        longterm.append({
-            "action": f"Review {len(stale_apps)} unused app(s) for removal",
-            "impact": "Reclaim disk space and reduce system cruft",
-            "effort": "15 min",
-            "cmd": "See App Cleanup Analysis below",
-        })
-
-    # ── Long-term: disk pressure ──
-    disk_warning = next((w for w in warnings if "disk" in w["check"].lower() and ("full" in w["summary"].lower() or "free" in w["summary"].lower())), None)
-    if disk_warning:
-        longterm.append({
-            "action": "Free disk space — clear caches, snapshots, Docker images",
-            "impact": "Prevents swap failures, enables macOS updates, improves SSD performance",
-            "effort": "20 min",
-            "cmd": disk_warning.get("fix", ""),
-        })
-
-    # ── Long-term: homebrew maintenance ──
-    brew_warnings = [w for w in warnings if w["check"] == "Homebrew"]
-    if len(brew_warnings) >= 3:
-        longterm.append({
-            "action": "Run Homebrew maintenance (brew upgrade, brew cleanup, brew doctor)",
-            "impact": "Security patches, bug fixes, reclaim cache space",
-            "effort": "15 min",
-            "cmd": "brew upgrade && brew cleanup",
-        })
-
-    # ── Long-term: install vitals monitor ──
+        longterm.append({"action": f"Review {len(stale_apps)} unused apps", "impact": "Reclaim disk space", "effort": "15 min", "cmd": ""})
+    if any("disk" in w["check"].lower() and ("full" in w["summary"].lower() or "free" in w["summary"].lower()) for w in warnings):
+        longterm.append({"action": "Free disk space", "impact": "Prevents swap failures, enables updates", "effort": "20 min", "cmd": "sudo tmutil thinlocalsnapshots / 9999999999 1"})
+    brew = [w for w in warnings if w["check"] == "Homebrew"]
+    if len(brew) >= 3:
+        longterm.append({"action": "Homebrew maintenance", "impact": "Security patches, reclaim cache space", "effort": "15 min", "cmd": "brew upgrade && brew cleanup"})
     from .launchd import _plist_path
     if not _plist_path().exists():
-        longterm.append({
-            "action": "Install apple-a-day vitals monitor for continuous health tracking",
-            "impact": "Builds time-series data for sustained pressure analysis — future reports will be richer",
-            "effort": "1 min",
-            "cmd": "aad install",
-        })
-
+        longterm.append({"action": "Install vitals monitor", "impact": "Better sustained pressure data in future reports", "effort": "1 min", "cmd": "aad install"})
     return {"immediate": immediate[:5], "longterm": longterm[:5]}
 
 
-# ── Main report generator ──
+# ── Scatterplot ──
+
+def _cleanup_scatterplot(stale_apps: list[dict], width: int = 780, height: int = 320) -> str:
+    if not stale_apps:
+        return ""
+    pad_l, pad_r, pad_t, pad_b = 60, 20, 20, 40
+    plot_w, plot_h = width - pad_l - pad_r, height - pad_t - pad_b
+    max_days = min(max(a.get("days_ago", 1) for a in stale_apps), 365)
+    max_size = max(max(a.get("size_mb", 1) for a in stale_apps), 100)
+    mid_x, mid_y = pad_l + plot_w * 0.5, pad_t + plot_h * 0.5
+    svg = f'<svg width="{width}" height="{height}" style="display:block;margin:8px 0">\n'
+    svg += f'<rect x="{mid_x}" y="{pad_t}" width="{plot_w * 0.5}" height="{plot_h * 0.5}" fill="rgba(239,68,68,0.05)" rx="4"/>\n'
+    svg += f'<text x="{mid_x + plot_w * 0.25}" y="{pad_t + 16}" text-anchor="middle" font-size="11" fill="#dc2626" font-weight="600">Suggest Removal</text>\n'
+    svg += f'<text x="{pad_l + plot_w * 0.25}" y="{pad_t + 16}" text-anchor="middle" font-size="11" fill="#64748b">Keep (watch size)</text>\n'
+    svg += f'<text x="{mid_x + plot_w * 0.25}" y="{pad_t + plot_h - 4}" text-anchor="middle" font-size="11" fill="#64748b">Low priority</text>\n'
+    svg += f'<text x="{pad_l + plot_w * 0.25}" y="{pad_t + plot_h - 4}" text-anchor="middle" font-size="11" fill="#22c55e">Fine</text>\n'
+    svg += f'<line x1="{mid_x}" y1="{pad_t}" x2="{mid_x}" y2="{pad_t + plot_h}" stroke="#e2e8f0" stroke-dasharray="4"/>\n'
+    svg += f'<line x1="{pad_l}" y1="{mid_y}" x2="{pad_l + plot_w}" y2="{mid_y}" stroke="#e2e8f0" stroke-dasharray="4"/>\n'
+    svg += f'<line x1="{pad_l}" y1="{pad_t + plot_h}" x2="{pad_l + plot_w}" y2="{pad_t + plot_h}" stroke="#94a3b8"/>\n'
+    svg += f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t + plot_h}" stroke="#94a3b8"/>\n'
+    svg += f'<text x="{pad_l + plot_w // 2}" y="{height - 4}" text-anchor="middle" font-size="12" fill="#64748b">Days since last use →</text>\n'
+    svg += f'<text x="14" y="{pad_t + plot_h // 2}" text-anchor="middle" font-size="12" fill="#64748b" transform="rotate(-90 14 {pad_t + plot_h // 2})">Size (MB) →</text>\n'
+    for app in stale_apps:
+        days = min(app.get("days_ago", 30), max_days)
+        size = min(app.get("size_mb", 0), max_size)
+        x = pad_l + (days - 30) / max(max_days - 30, 1) * plot_w
+        y = pad_t + plot_h - (size / max_size * plot_h)
+        in_remove = days > max_days * 0.5 and size > max_size * 0.3
+        color = "#ef4444" if in_remove else "#0284c7"
+        r = max(4, min(12, size / max_size * 15 + 3))
+        svg += f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{r:.0f}" fill="{color}" opacity="0.7"><title>{app["name"]}</title></circle>\n'
+        if size > max_size * 0.15 or in_remove:
+            svg += f'<text x="{x + r + 3:.0f}" y="{y + 4:.0f}" font-size="10" fill="#475569">{app["name"][:20]}</text>\n'
+    svg += '</svg>'
+    return svg
+
+
+# ── Main entry points ──
 
 def generate_html_report(vitals_minutes: int = 60) -> str:
+    """Collect all data and render via Jinja2 templates."""
     report = run_all_checks(parallel=True)
-    vitals = analyze_vitals(minutes=vitals_minutes)
+    vitals_data = analyze_vitals(minutes=vitals_minutes)
     history = read_recent(10)
     samples = read_vitals(minutes=vitals_minutes)
     cores = os.cpu_count() or 8
     info = report.mac_info
-    uptime = _get_uptime()
+    ram_gb = info.get("memory_gb", 0)
 
+    # Findings
     criticals, warnings, infos = [], [], []
     for r in report.results:
         for f in r.findings:
-            entry = {"check": r.name, "summary": f.summary, "fix": f.fix,
-                     "details": f.details, "severity": f.severity.value}
-            if f.severity.value == "critical":
-                criticals.append(entry)
-            elif f.severity.value == "warning":
-                warnings.append(entry)
-            elif f.severity.value == "info":
-                infos.append(entry)
+            entry = {"check": r.name, "summary": f.summary, "fix": f.fix, "details": f.details, "severity": f.severity.value}
+            if f.severity.value == "critical": criticals.append(entry)
+            elif f.severity.value == "warning": warnings.append(entry)
+            elif f.severity.value == "info": infos.append(entry)
 
+    # Matrix
     matrix = _compute_matrix(report)
     overall = matrix.pop("_overall", 0)
     grade = matrix.pop("_grade", "?")
+    grade_color = {"A": "#22c55e", "B": "#22c55e", "C": "#ca8a04", "D": "#ef4444", "F": "#ef4444"}.get(grade, "#94a3b8")
 
-    spikes = vitals.get("load", {}).get("spikes", [])
-    offenders = vitals.get("worst_offenders", [])
+    # Vitals
+    spikes = vitals_data.get("load", {}).get("spikes", [])
+    offenders = vitals_data.get("worst_offenders", [])
+    sustained = [o for o in offenders if o.get("sustained")]
+    transient = [o for o in offenders if not o.get("sustained")]
 
+    # Load
+    load_values = [s["load"][0] for s in samples if "load" in s] if samples else []
+
+    # System info
+    swap_mb = vitals_data.get("swap", {}).get("current_mb") or 0
+    swap_gb = round(swap_mb / 1024, 1)
+    swap_pct = int(swap_gb / ram_gb * 100) if ram_gb else 0
+    swap_color = "#ef4444" if swap_pct > 50 else "#ca8a04" if swap_pct > 25 else "#22c55e"
+    current_load = samples[-1]["load"][0] if samples and "load" in samples[-1] else 0
+    load_pct = int(current_load / cores * 100) if cores else 0
+    load_color = "#ef4444" if load_pct > 200 else "#ca8a04" if load_pct > 100 else "#22c55e"
+
+    # Disk
+    disk_total_gb = disk_used_gb = disk_pct = 0
+    try:
+        out = subprocess.run(["df", "-g", "/"], capture_output=True, text=True, timeout=5)
+        if out.returncode == 0:
+            parts = out.stdout.strip().split("\n")[1].split()
+            disk_total_gb, disk_used_gb = int(parts[1]), int(parts[2])
+            disk_pct = int(disk_used_gb / disk_total_gb * 100) if disk_total_gb else 0
+    except Exception:
+        pass
+    disk_color = "#ef4444" if disk_pct > 90 else "#ca8a04" if disk_pct > 75 else "#22c55e"
+
+    # Process tables
+    cpu_hogs, mem_hogs = _get_live_process_tables()
+    daemon_hogs = [p for p in cpu_hogs if _is_daemon(p.get("cmdline", ""))]
+    app_cpu_hogs = [p for p in cpu_hogs if not _is_daemon(p.get("cmdline", ""))]
+
+    # Criticals grouped
+    criticals_by_check = {}
+    for c in criticals:
+        criticals_by_check.setdefault(c["check"], []).append(c)
+    criticals_by_check_sorted = sorted(criticals_by_check.items(), key=lambda x: -len(x[1]))
+
+    # Matrix dimensions
+    dim_check_map = {"stability": ["Crash Loops", "Kernel Panics", "Shutdown Causes"],
+                     "cpu": ["CPU Load"], "thermal": ["Thermal"], "memory": ["Memory Pressure"],
+                     "storage": ["Disk Health"], "services": ["Launch Agents"],
+                     "security": ["Security"], "infra": ["Dynamic Library Health", "Homebrew"], "network": ["Network"]}
+    all_findings = criticals + warnings
+    dimensions = []
+    for dim, label in [("stability", "Stability"), ("cpu", "CPU"), ("thermal", "Thermal"),
+                       ("memory", "Memory"), ("storage", "Storage"), ("services", "Services"),
+                       ("security", "Security"), ("infra", "Infra"), ("network", "Network")]:
+        val = matrix.get(dim, 100)
+        issue = ""
+        for item in all_findings:
+            if item["check"] in dim_check_map.get(dim, []):
+                issue = item["summary"]
+                break
+        dimensions.append({"dim": dim, "label": label, "value": val, "bar_svg": _bar_svg(val), "issue": issue})
+
+    # Cleanup
+    stale_apps = _find_stale_apps()
+    remove_candidates = [a for a in stale_apps if a.get("days_ago", 0) > 90]
+
+    # Redundancy
+    all_apps_for_sim = []
+    for app_path in _glob.glob("/Applications/*.app"):
+        name = os.path.basename(app_path).replace(".app", "")
+        if name in _SAFE_APPS:
+            continue
+        lu = _get_last_used(app_path)
+        days_ago = 999
+        if lu:
+            try:
+                d = datetime.fromisoformat(lu.replace(" +0000", "+00:00"))
+                days_ago = (datetime.now(timezone.utc) - d).days
+            except ValueError:
+                pass
+        all_apps_for_sim.append({"name": name, "path": app_path, "days_ago": days_ago})
+    redundant = find_redundant_apps(all_apps_for_sim)
+
+    # Action plan
+    action_plan = _build_action_plan(criticals, warnings, spikes, offenders, stale_apps, redundant)
+
+    # Trend
     trend = None
     if len(history) >= 3:
         recent_c = sum(e.get("counts", {}).get("critical", 0) for e in history[-3:]) / 3
         older_c = sum(e.get("counts", {}).get("critical", 0) for e in history[:3]) / 3
         trend = "improving" if recent_c < older_c else "degrading" if recent_c > older_c else "stable"
 
-    # Action plan is built later after stale_apps/redundant are computed
-    # Placeholder — will be rendered after data collection
-    _action_plan_data = {"criticals": criticals, "warnings": warnings, "spikes": spikes, "offenders": offenders}
-    grade_color = {"A": "#22c55e", "B": "#22c55e", "C": "#ca8a04", "D": "#ef4444", "F": "#ef4444"}.get(grade, "#94a3b8")
-    now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-    bluf_text = _generate_bluf(criticals, warnings, infos, spikes)
+    # Render
+    env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)), autoescape=False)
+    env.globals.update({
+        "sev_badge": _sev_badge, "knowledge_card": _knowledge_card,
+        "match_topics": match_topics, "get_tradeoff": _get_tradeoff_fn,
+        "process_action": _process_action, "mini_sparkline": _mini_sparkline,
+        "cpu_bar": _cpu_bar, "mem_bar": _mem_bar, "mem_gb": _mem_gb,
+        "bar_html": _bar_html, "size_bar": _size_bar,
+    })
 
-    # Collect all knowledge topics referenced
-    all_topics: set[str] = set()
-    for item in criticals + warnings:
-        all_topics.update(match_topics(item["summary"], item["check"]))
-
-    html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<title>apple-a-day — {grade} ({overall}/100)</title>
-<style>
-  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  body {{ background: #faf9f6; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 0; margin: 0; font-size: 14px; line-height: 1.5; }}
-  code, .mono {{ font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }}
-  h1 {{ font-size: 20px; font-weight: 700; margin-bottom: 4px; }}
-  h2 {{ font-size: 15px; font-weight: 600; color: #475569; margin: 28px 0 12px; border-bottom: 1px solid #e7e5e0; padding-bottom: 6px; }}
-  .header {{ background: linear-gradient(135deg, #f0f7f0 0%, #fff 60%); border: 1px solid #d4e5d4; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }}
-  .header-left h1 {{ color: #1a3a1a; }}
-  .header-left h1::before {{ content: "🍎 "; }}
-  .header-left .subtitle {{ color: #64748b; font-size: 13px; margin-top: 4px; }}
-  .bluf {{ background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }}
-  .bluf-label {{ font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; margin-bottom: 6px; }}
-  .bluf-summary {{ font-size: 15px; line-height: 1.6; }}
-  .bluf-counts {{ display: flex; gap: 12px; margin-top: 12px; font-size: 12px; }}
-  .bluf-count {{ padding: 3px 12px; border-radius: 4px; font-weight: 600; }}
-  .bluf-count.crit {{ background: #fef2f2; color: #dc2626; }}
-  .bluf-count.warn {{ background: #fffbeb; color: #92400e; }}
-  .bluf-count.info {{ background: #eff6ff; color: #1e40af; }}
-  .sysinfo {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px; }}
-  .sysinfo-item {{ background: #fff; border: 1px solid #e7e5e0; border-radius: 6px; padding: 12px 16px; text-align: center; }}
-  .sysinfo-val {{ font-size: 18px; font-weight: 700; color: #0f172a; font-family: 'SF Mono', monospace; }}
-  .sysinfo-denom {{ font-size: 12px; font-weight: 400; color: #94a3b8; }}
-  .sysinfo-label {{ font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }}
-  .sysinfo-bar {{ height: 4px; background: #e2e8f0; border-radius: 2px; margin-top: 6px; overflow: hidden; }}
-  .sysinfo-fill {{ height: 100%; border-radius: 2px; }}
-  .card {{ background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; padding: 16px 20px; margin: 12px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }}
-  .matrix-row {{ display: flex; align-items: center; margin: 6px 0; }}
-  .matrix-label {{ width: 90px; font-size: 13px; color: #475569; }}
-  .matrix-val {{ font-size: 13px; color: #64748b; margin-left: 8px; width: 30px; text-align: right; font-family: 'SF Mono', monospace; }}
-  .finding {{ padding: 10px 0; border-bottom: 1px solid #f1f5f9; }}
-  .finding:last-child {{ border-bottom: none; }}
-  .finding-fix {{ font-size: 13px; color: #475569; margin-top: 6px; padding-left: 16px; border-left: 2px solid #e2e8f0; }}
-  .offender {{ display: flex; align-items: center; margin: 6px 0; font-size: 13px; }}
-  .offender-name {{ width: 200px; color: #1e293b; font-family: 'SF Mono', monospace; }}
-  .focus-box {{ background: #fff; border: 2px solid #5a9a5a; border-radius: 8px; padding: 20px; margin: 20px 0; }}
-  .focus-box h2 {{ border-bottom: none; margin: 0 0 12px; color: #0f172a; font-size: 16px; }}
-  .focus-item {{ padding: 6px 0; font-size: 14px; }}
-  .focus-item .tag {{ font-weight: 700; }}
-  .focus-item .tag-fix {{ color: #dc2626; }}
-  .focus-item .tag-now {{ color: #d97706; }}
-  .focus-item .tag-review {{ color: #92400e; }}
-  .focus-item .tag-watch {{ color: #0284c7; }}
-  .spike {{ background: #fef2f2; border-left: 3px solid #ef4444; padding: 8px 12px; margin: 6px 0; font-size: 13px; border-radius: 0 4px 4px 0; }}
-  .spark-container {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; }}
-  .spark-stats {{ display: flex; gap: 24px; margin-top: 8px; font-size: 12px; color: #64748b; font-family: 'SF Mono', monospace; }}
-  .spark-stats b {{ color: #1e293b; }}
-  .knowledge {{ background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; margin: 8px 0; font-size: 13px; }}
-  .knowledge summary {{ padding: 8px 12px; cursor: pointer; color: #0284c7; font-weight: 500; }}
-  .knowledge summary:hover {{ background: #f1f5f9; }}
-  .knowledge .k-section {{ padding: 6px 12px 6px 24px; color: #475569; line-height: 1.6; }}
-  .knowledge .k-section b {{ color: #1e293b; }}
-  .tradeoff {{ background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 12px 16px; margin: 8px 0; font-size: 13px; }}
-  .tradeoff-gain {{ color: #16a34a; }}
-  .tradeoff-lose {{ color: #dc2626; }}
-  .trend-card {{ font-size: 15px; }}
-  .trend-up {{ color: #16a34a; }}
-  .trend-down {{ color: #dc2626; }}
-  .trend-flat {{ color: #64748b; }}
-  table {{ width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }}
-  th {{ text-align: left; padding: 8px 12px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }}
-  td {{ padding: 6px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }}
-  tr:hover {{ background: #f8fafc; }}
-  .mono {{ font-family: 'SF Mono', monospace; font-size: 12px; }}
-  code {{ word-break: break-all; }}
-  .action-cmd {{ background: #f1f5f9; padding: 2px 8px; border-radius: 3px; font-family: 'SF Mono', monospace; font-size: 11px; color: #334155; display: inline-block; margin-top: 2px; word-break: break-all; }}
-  .finding-fix {{ word-wrap: break-word; overflow-wrap: break-word; }}
-  .matrix-issue {{ font-size: 12px; color: #64748b; margin-left: 8px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
-  .matrix-row {{ flex-wrap: nowrap; overflow: hidden; }}
-  .level-pills {{ display: flex; gap: 0; margin-bottom: 20px; background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; overflow: hidden; }}
-  .level-pill {{ flex: 1; padding: 10px 16px; text-align: center; cursor: pointer; font-size: 13px; font-weight: 500; color: #64748b; border-right: 1px solid #e7e5e0; transition: all 0.15s; user-select: none; }}
-  .level-pill:last-child {{ border-right: none; }}
-  .level-pill:hover {{ background: #f8f7f4; }}
-  .level-pill.active {{ background: #1a3a1a; color: #fff; }}
-  .level-pill .pill-desc {{ font-size: 11px; font-weight: 400; display: block; margin-top: 1px; }}
-  .l2 {{ display: none; }}
-  .l3 {{ display: none; }}
-  body {{ display: flex; }}
-  .sidebar {{ position: fixed; left: 0; top: 0; width: 180px; height: 100vh; background: #fff; border-right: 1px solid #e7e5e0; padding: 20px 12px; overflow-y: auto; z-index: 10; }}
-  .sidebar .logo {{ font-size: 20px; font-weight: 700; color: #1a3a1a; margin-bottom: 16px; padding: 0 8px; }}
-  .sidebar nav {{ font-size: 12px; }}
-  .sidebar nav a {{ display: block; padding: 5px 10px; color: #64748b; text-decoration: none; border-radius: 4px; margin: 1px 0; transition: all 0.1s; }}
-  .sidebar nav a:hover {{ background: #f0f7f0; color: #1a3a1a; }}
-  .sidebar nav a.active {{ background: #1a3a1a; color: #fff; }}
-  .sidebar nav .nav-label {{ font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; padding: 10px 10px 3px; }}
-  .main {{ margin-left: 180px; flex: 1; min-width: 0; max-width: 860px; padding: 24px; }}
-  .layout {{ display: block; }}
-  .apple-progress {{ position: fixed; left: 0; bottom: 0; width: 180px; height: 48px; background: #fff; border-top: 1px solid #e7e5e0; border-right: 1px solid #e7e5e0; display: flex; align-items: center; padding: 0 16px; z-index: 11; }}
-  .apple-track {{ flex: 1; height: 4px; background: #e7e5e0; border-radius: 2px; position: relative; }}
-  .apple-dot {{ position: absolute; top: -10px; font-size: 20px; transition: left 0.15s; }}
-  @media (max-width: 900px) {{ .sidebar {{ display: none; }} .main {{ margin-left: 0; }} .apple-progress {{ display: none; }} }}
-  footer {{ margin-top: 32px; padding-top: 16px; border-top: 1px solid #e7e5e0; font-size: 11px; color: #94a3b8; text-align: center; }}
-  footer::before {{ content: "🍏 "; }}
-</style>
-</head>
-<body>
-
-<div class="header">
-  <div class="header-left">
-    <h1>apple-a-day health report</h1>
-    <div class="subtitle">macOS {info.get('os_version', '?')} · {info.get('cpu', '?')} · {now_str}</div>
-  </div>
-  <div>{_donut_svg(overall, grade, grade_color)}</div>
-</div>
-
-<div class="bluf" id="bluf">
-  <div class="bluf-label">Bottom Line Up Front</div>
-  <div class="bluf-summary">{bluf_text}</div>
-  <div class="bluf-counts">
-    <span class="bluf-count crit">{len(criticals)} critical</span>
-    <span class="bluf-count warn">{len(warnings)} warning</span>
-    <span class="bluf-count info">{len(infos)} info</span>
-  </div>
-</div>
-"""
-
-    # ── System Info strip with ratios ──
-    ram_gb = info.get('memory_gb', 0)
-    swap_mb = vitals.get("swap", {}).get("current_mb") or 0
-    swap_gb = swap_mb / 1024
-    swap_pct = int(swap_gb / ram_gb * 100) if ram_gb else 0
-    swap_color = "#ef4444" if swap_pct > 50 else "#ca8a04" if swap_pct > 25 else "#22c55e"
-
-    # Get disk info
-    disk_total_gb, disk_used_gb, disk_free_gb = 0, 0, 0
-    try:
-        out = subprocess.run(["df", "-g", "/"], capture_output=True, text=True, timeout=5)
-        if out.returncode == 0:
-            parts = out.stdout.strip().split("\n")[1].split()
-            disk_total_gb = int(parts[1])
-            disk_used_gb = int(parts[2])
-            disk_free_gb = int(parts[3])
-    except (subprocess.TimeoutExpired, OSError, IndexError, ValueError):
-        pass
-    disk_pct = int(disk_used_gb / disk_total_gb * 100) if disk_total_gb else 0
-    disk_color = "#ef4444" if disk_pct > 90 else "#ca8a04" if disk_pct > 75 else "#22c55e"
-
-    # Current load ratio
-    current_load = samples[-1]["load"][0] if samples and "load" in samples[-1] else 0
-    load_pct = int(current_load / cores * 100) if cores else 0
-    load_color = "#ef4444" if load_pct > 200 else "#ca8a04" if load_pct > 100 else "#22c55e"
-
-    html += f"""<div class="sysinfo" id="sysinfo">
-  <div class="sysinfo-item">
-    <div class="sysinfo-val">{current_load:.0f} <span class="sysinfo-denom">/ {cores}</span></div>
-    <div class="sysinfo-label">Load / Cores</div>
-    <div class="sysinfo-bar"><div class="sysinfo-fill" style="width:{min(load_pct, 100)}%;background:{load_color}"></div></div>
-  </div>
-  <div class="sysinfo-item">
-    <div class="sysinfo-val">{swap_gb:.1f} <span class="sysinfo-denom">/ {ram_gb} GB</span></div>
-    <div class="sysinfo-label">Swap / RAM</div>
-    <div class="sysinfo-bar"><div class="sysinfo-fill" style="width:{min(swap_pct, 100)}%;background:{swap_color}"></div></div>
-  </div>
-  <div class="sysinfo-item">
-    <div class="sysinfo-val">{disk_used_gb} <span class="sysinfo-denom">/ {disk_total_gb} GB</span></div>
-    <div class="sysinfo-label">Disk Used</div>
-    <div class="sysinfo-bar"><div class="sysinfo-fill" style="width:{disk_pct}%;background:{disk_color}"></div></div>
-  </div>
-  <div class="sysinfo-item">
-    <div class="sysinfo-val">{uptime}</div>
-    <div class="sysinfo-label">Uptime</div>
-  </div>
-</div>
-"""
-
-    # ── Level pills ──
-    html += """<div class="level-pills">
-  <div class="level-pill active" onclick="setLevel(1)">Summary<span class="pill-desc">Score + actions</span></div>
-  <div class="level-pill" onclick="setLevel(2)">Standard<span class="pill-desc">+ issues &amp; pressure</span></div>
-  <div class="level-pill" onclick="setLevel(3)">Full Detail<span class="pill-desc">+ tables &amp; charts</span></div>
-</div>
-<script>
-function setLevel(n) {
-  document.querySelectorAll('.level-pill').forEach((p, i) => p.classList.toggle('active', i === n - 1));
-  document.querySelectorAll('.l2').forEach(s => s.style.display = n >= 2 ? 'block' : 'none');
-  document.querySelectorAll('.l3').forEach(s => s.style.display = n >= 3 ? 'block' : 'none');
-}
-</script>
-"""
-
-    # ── Fixed sidebar + apple progress ──
-    html += """<div class="sidebar">
-  <div class="logo">🍎 aad</div>
-  <nav>
-    <div class="nav-label">Overview</div>
-    <a href="#bluf">BLUF</a>
-    <a href="#sysinfo">System</a>
-    <a href="#actions">Actions</a>
-    <div class="nav-label">Analysis</div>
-    <a href="#matrix">Health Matrix</a>
-    <a href="#pressure">Pressure</a>
-    <a href="#criticals">Critical Issues</a>
-    <div class="nav-label">Deep Dive</div>
-    <a href="#load">Load History</a>
-    <a href="#hogs">Process Hogs</a>
-    <a href="#warnings">Warnings</a>
-    <a href="#cleanup">App Cleanup</a>
-    <a href="#redundant">Redundant Apps</a>
-  </nav>
-  <div class="apple-progress">
-    <div class="apple-track"><span class="apple-dot" id="appleDot">🍎</span></div>
-  </div>
-</div>
-<div class="main">
-<script>
-// Apple scroll progress
-const dot = document.getElementById('appleDot');
-const navLinks = document.querySelectorAll('.sidebar nav a');
-window.addEventListener('scroll', () => {
-  const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100;
-  if (dot) dot.style.left = Math.min(pct, 95) + '%';
-  // Highlight active nav link
-  let active = null;
-  navLinks.forEach(a => {
-    const id = a.getAttribute('href')?.slice(1);
-    const el = id && document.getElementById(id);
-    if (el && el.getBoundingClientRect().top <= 80) active = a;
-  });
-  navLinks.forEach(a => a.classList.remove('active'));
-  if (active) active.classList.add('active');
-});
-</script>
-"""
-
-    # ── Action Plan (rendered later, after stale_apps/redundant are available) ──
-    # Placeholder — the actual rendering happens below after data collection
-
-    html += '<div class="l2">\n'
-    # ── Health Matrix (with worst finding per dimension) ──
-    # Map dimensions to check names for finding lookup
-    dim_check_map = {
-        "stability": ["Crash Loops", "Kernel Panics", "Shutdown Causes"],
-        "cpu": ["CPU Load"], "thermal": ["Thermal"], "memory": ["Memory Pressure"],
-        "storage": ["Disk Health"], "services": ["Launch Agents"],
-        "security": ["Security"], "infra": ["Dynamic Library Health", "Homebrew"],
-        "network": ["Network"],
-    }
-    # Find worst finding per dimension
-    dim_worst: dict[str, str] = {}
-    all_findings = criticals + warnings
-    for dim, checks in dim_check_map.items():
-        for item in all_findings:
-            if item["check"] in checks:
-                dim_worst[dim] = item["summary"]
-                break
-
-    html += '<h2 id="matrix">Health Matrix</h2>\n'
-    for dim, label in [("stability", "Stability"), ("cpu", "CPU"), ("thermal", "Thermal"),
-                       ("memory", "Memory"), ("storage", "Storage"), ("services", "Services"),
-                       ("security", "Security"), ("infra", "Infra"), ("network", "Network")]:
-        val = matrix.get(dim, 100)
-        issue = dim_worst.get(dim, "")
-        issue_html = f'<span class="matrix-issue">{_esc(issue[:60])}</span>' if issue else ""
-        html += f'<div class="matrix-row"><span class="matrix-label">{label}</span>{_bar_svg(val)}<span class="matrix-val">{val}</span>{issue_html}</div>\n'
-
-    html += '<div class="l3">\n'
-    # ── Load Sparkline ──
-    if samples:
-        load_values = [s["load"][0] for s in samples if "load" in s]
-        if load_values:
-            peak = max(load_values)
-            avg = sum(load_values) / len(load_values)
-            html += '<h2 id="load">Load History</h2>\n<div class="spark-container">\n'
-            html += _sparkline_svg(load_values, width=780, height=70)
-            html += f'<div class="spark-stats"><span>peak: <b>{peak:.0f}</b></span><span>avg: <b>{avg:.1f}</b></span><span>cores: <b>{cores}</b></span><span>samples: <b>{len(load_values)}</b></span></div>\n'
-            html += '</div>\n'
-            if spikes:
-                for s in spikes[:3]:
-                    ongoing = ' <span style="color:#ef4444;font-weight:700">ONGOING</span>' if s.get("ongoing") else ""
-                    procs = ", ".join(f"{p[1]} ({p[0]}%)" for p in s.get("top_processes", [])[:3])
-                    html += f'<div class="spike">▲ spike peak <b>{s["peak_load"]:.0f}x</b> — {_esc(procs)}{ongoing}</div>\n'
-            html += _knowledge_card(["load_average"])
-
-    html += '</div><!-- /l3 -->\n'
-    # ── Sustained Pressure (from vitals time-series) — L2 ──
-    if offenders:
-        sustained = [o for o in offenders if o.get("sustained")]
-        transient = [o for o in offenders if not o.get("sustained")]
-
-        if sustained:
-            html += '<h2 id="pressure">Sustained Pressure (long-running load)</h2>\n<div class="card">\n'
-            html += '<div style="font-size:12px;color:#64748b;margin-bottom:8px">Processes consuming CPU across >50% of the monitoring window. These cause crashes, not spikes.</div>\n'
-            max_total = max(o["total_cpu"] for o in sustained) if sustained else 1
-            html += '<table><tr><th>Process</th><th style="width:200px">Cumulative CPU</th><th>Avg CPU</th><th>Present</th><th>Pattern</th></tr>\n'
-            for o in sustained[:7]:
-                bar_w = int(o["total_cpu"] / max(max_total, 1) * 140)
-                color = "#ef4444" if o["avg_cpu"] > 30 else "#ca8a04" if o["avg_cpu"] > 10 else "#0284c7"
-                bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{o["total_cpu"]:.0f}%·s</span></div>'
-                spark = _mini_sparkline(o.get("cpu_series", []))
-                html += f'<tr><td class="mono">{_esc(o["name"])}</td><td>{bar}</td><td class="mono">{o["avg_cpu"]}%</td><td>{o["presence_pct"]:.0f}%</td><td>{spark}</td></tr>\n'
-            html += '</table></div>\n'
-            html += _knowledge_card(["load_average"])
-
-        if transient:
-            html += '<h2>Transient Load (spikes)</h2>\n<div class="card">\n'
-            html += '<div style="font-size:12px;color:#64748b;margin-bottom:8px">Processes that appeared briefly at high CPU. Usually normal (builds, scans, syncs).</div>\n'
-            max_peak = max(o["peak_cpu"] for o in transient[:7])
-            html += '<table><tr><th>Process</th><th style="width:200px">Peak CPU</th><th>Seen</th><th>Pattern</th></tr>\n'
-            for o in transient[:5]:
-                bar_w = int(o["peak_cpu"] / max(max_peak, 1) * 140)
-                color = "#ca8a04" if o["peak_cpu"] > 30 else "#0284c7"
-                bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{o["peak_cpu"]}%</span></div>'
-                spark = _mini_sparkline(o.get("cpu_series", []))
-                html += f'<tr><td class="mono">{_esc(o["name"])}</td><td>{bar}</td><td>{o["appearances"]}x</td><td>{spark}</td></tr>\n'
-            html += '</table></div>\n'
-
-    # ── Live Process Tables (CPU, Memory) ──
-    cpu_hogs, mem_hogs = _get_live_process_tables()
-
-    html += '<div class="l3">\n'
-    # Split processes into daemons vs regular
-    daemon_hogs = [p for p in cpu_hogs if _is_daemon(p.get("cmdline", ""))]
-    app_cpu_hogs = [p for p in cpu_hogs if not _is_daemon(p.get("cmdline", ""))]
-
-    if daemon_hogs:
-        max_cpu_d = max(float(p["cpu"]) for p in daemon_hogs)
-        html += '<h2 id="hogs">Daemon Hogs (background services)</h2>\n<div class="card">\n'
-        html += '<div style="font-size:12px;color:#64748b;margin-bottom:8px">These are launchd-managed services or background scripts running without a visible app window.</div>\n'
-        html += '<table><tr><th>Service</th><th style="width:200px">CPU %</th><th>What it is</th></tr>\n'
-        for p in daemon_hogs:
-            cpu_val = float(p["cpu"])
-            bar_w = int(cpu_val / max(max_cpu_d, 1) * 140)
-            color = "#ef4444" if cpu_val > 50 else "#ca8a04" if cpu_val > 20 else "#0284c7"
-            bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{p["cpu"]}%</span></div>'
-            identity = _process_action(p["name"], p.get("cmdline", ""))
-            html += f'<tr><td class="mono">{_esc(p["name"])} <span style="color:#94a3b8">({p["pid"]})</span></td><td>{bar}</td><td>{identity}</td></tr>\n'
-        html += '</table></div>\n'
-
-    if app_cpu_hogs:
-        max_cpu = max(float(p["cpu"]) for p in app_cpu_hogs)
-        html += '<h2>CPU Hogs (right now)</h2>\n<div class="card">\n'
-        html += f'<table><tr><th>Process</th><th style="width:200px">CPU (of {cores * 100}% total)</th><th>MEM (of {ram_gb} GB)</th><th>What it is</th></tr>\n'
-        for p in app_cpu_hogs:
-            cpu_val = float(p["cpu"])
-            bar_w = int(cpu_val / max(max_cpu, 1) * 140)
-            color = "#ef4444" if cpu_val > 50 else "#ca8a04" if cpu_val > 20 else "#0284c7"
-            bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{p["cpu"]}%</span></div>'
-            identity = _process_action(p["name"], p.get("cmdline", ""))
-            mem_gb = round(float(p["mem"]) / 100 * ram_gb, 1) if ram_gb else p["mem"]
-            html += f'<tr><td class="mono">{_esc(p["name"])} <span style="color:#94a3b8">({p["pid"]})</span></td><td>{bar}</td><td class="mono">{mem_gb} GB</td><td>{identity}</td></tr>\n'
-        html += '</table></div>\n'
-
-    if mem_hogs:
-        max_mem = max(float(p["mem"]) for p in mem_hogs)
-        html += '<h2>Memory Hogs (right now)</h2>\n<div class="card">\n'
-        html += f'<table><tr><th>Process</th><th style="width:200px">MEM (of {ram_gb} GB)</th><th>CPU</th><th>What it is</th></tr>\n'
-        for p in mem_hogs:
-            mem_val = float(p["mem"])
-            bar_w = int(mem_val / max(max_mem, 1) * 140)
-            color = "#ef4444" if mem_val > 10 else "#ca8a04" if mem_val > 5 else "#0284c7"
-            mem_gb = round(mem_val / 100 * ram_gb, 1) if ram_gb else 0
-            bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{mem_gb} GB</span></div>'
-            identity = _process_action(p["name"], p.get("cmdline", ""))
-            html += f'<tr><td class="mono">{_esc(p["name"])} <span style="color:#94a3b8">({p["pid"]})</span></td><td>{bar}</td><td class="mono">{p["cpu"]}%</td><td>{identity}</td></tr>\n'
-        html += '</table></div>\n'
-
-    html += '</div><!-- /l3 hog tables -->\n'
-    # ── Critical Issues ── (L2)
-    if criticals:
-        html += f'<h2 id="criticals" style="color:#dc2626">Critical Issues ({len(criticals)})</h2>\n<div class="card">\n'
-        by_check: dict[str, list] = {}
-        for c in criticals:
-            by_check.setdefault(c["check"], []).append(c)
-        topics_shown: set[str] = set()
-        for check, items in sorted(by_check.items(), key=lambda x: -len(x[1])):
-            html += f'<div class="finding">{_sev_badge("critical")} <b>{_esc(check)}</b> — {len(items)} issue(s)\n'
-            for item in items[:5]:
-                html += f'<div style="margin-left:16px;font-size:13px;color:#334155;margin-top:4px">{_esc(item["summary"])}</div>\n'
-            if len(items) > 5:
-                html += f'<div style="margin-left:16px;font-size:12px;color:#64748b">...and {len(items) - 5} more</div>\n'
-            if items[0].get("fix"):
-                html += f'<div class="finding-fix">→ {_esc(items[0]["fix"])}</div>\n'
-            # Knowledge cards for this check (show once per topic)
-            check_topics = match_topics(items[0]["summary"], check)
-            new_topics = [t for t in check_topics if t not in topics_shown]
-            if new_topics:
-                html += _knowledge_card(new_topics)
-                topics_shown.update(new_topics)
-            html += '</div>\n'
-        html += '</div>\n'
-
-    html += '<div class="l3">\n'
-
-    # ── Warnings with trade-off framing ──
-    if warnings:
-        html += f'<h2 id="warnings" style="color:#92400e">Warnings ({len(warnings)})</h2>\n<div class="card">\n'
-        topics_shown_w: set[str] = set()
-        for w_item in warnings:
-            html += f'<div class="finding">{_sev_badge("warning")} {_esc(w_item["summary"])}\n'
-            if w_item.get("fix"):
-                html += f'<div class="finding-fix">→ {_esc(w_item["fix"])}</div>\n'
-            # Trade-off framing for actionable warnings
-            tradeoff = _get_tradeoff(w_item)
-            if tradeoff:
-                html += f'<div class="tradeoff"><span class="tradeoff-gain">Gain:</span> {_esc(tradeoff["gain"])}<br><span class="tradeoff-lose">Lose:</span> {_esc(tradeoff["lose"])}</div>\n'
-            # Knowledge card
-            w_topics = match_topics(w_item["summary"], w_item["check"])
-            new_w = [t for t in w_topics if t not in topics_shown_w]
-            if new_w:
-                html += _knowledge_card(new_w)
-                topics_shown_w.update(new_w)
-            html += '</div>\n'
-        html += '</div>\n'
-
-    # ── App Cleanup Scatterplot + Redundancy Analysis ──
-    from .checks.cleanup import _find_stale_apps
-    stale_apps = _find_stale_apps()
-
-    # Find redundant apps (unused apps that have an active equivalent)
-    from .app_similarity import find_redundant_apps
-    import glob as _glob
-    all_apps_for_sim = []
-    for app_path in _glob.glob("/Applications/*.app"):
-        from .checks.cleanup import _get_last_used, _get_bundle_id, _SAFE_APPS
-        name = os.path.basename(app_path).replace(".app", "")
-        if name in _SAFE_APPS:
-            continue
-        last_used_str = _get_last_used(app_path)
-        if last_used_str:
-            from datetime import timezone
-            now_utc = datetime.now(timezone.utc)
-            try:
-                last_dt = datetime.fromisoformat(last_used_str.replace(" +0000", "+00:00"))
-                days_ago = (now_utc - last_dt).days
-            except ValueError:
-                days_ago = 999
-        else:
-            days_ago = 999
-        all_apps_for_sim.append({"name": name, "path": app_path, "days_ago": days_ago})
-    redundant = find_redundant_apps(all_apps_for_sim)
-    if stale_apps:
-        html += '<h2 id="cleanup">App Cleanup Analysis</h2>\n<div class="card">\n'
-        html += '<div style="font-size:13px;color:#475569;margin-bottom:8px">Apps plotted by size (impact) vs. time since last use. Top-right quadrant = high impact, rarely used — best removal candidates.</div>\n'
-        html += _cleanup_scatterplot(stale_apps)
-        # Companion table — actionable list
-        remove_candidates = [a for a in stale_apps if a.get("days_ago", 0) > 90]
-        if remove_candidates:
-            max_size_rc = max(a.get("size_mb", 1) for a in remove_candidates[:10])
-            html += '<table style="margin-top:12px"><tr><th>App</th><th style="width:200px">Size</th><th>Last Used</th><th>Action</th></tr>\n'
-            for a in remove_candidates[:10]:
-                size = a.get("size_mb", 0)
-                size_str = f"{size} MB" if size < 1024 else f"{size / 1024:.1f} GB"
-                bar_w = int(size / max(max_size_rc, 1) * 140)
-                color = "#ef4444" if size > 500 else "#ca8a04" if size > 100 else "#0284c7"
-                bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{size_str}</span></div>'
-                name = _esc(a["name"])
-                html += f'<tr><td>{name}</td><td>{bar}</td><td>{a.get("last_used", "?")}</td>'
-                html += f'<td><span class="action-cmd">sudo rm -rf "/Applications/{name}.app"</span></td></tr>\n'
-            html += '</table>\n'
-        html += '</div>\n'
-
-    # ── Redundant Apps (you already have something better) ──
-    if redundant:
-        html += '<h2 id="redundant">Safe to Remove (you already have an alternative)</h2>\n<div class="card">\n'
-        html += '<div style="font-size:12px;color:#475569;margin-bottom:8px">These unused apps have an actively-used equivalent on your Mac.</div>\n'
-        html += '<table><tr><th>Unused App</th><th>Last Used</th><th>You Already Use</th><th>Why Similar</th></tr>\n'
-        for r in redundant[:10]:
-            unused = r["unused"]
-            active = r["active"]
-            score_pct = int(r["score"] * 100)
-            color = "#16a34a" if score_pct >= 70 else "#ca8a04"
-            html += (f'<tr><td><b>{_esc(unused["name"])}</b></td>'
-                     f'<td>{unused.get("days_ago", "?")}d ago</td>'
-                     f'<td style="color:{color}"><b>{_esc(active["name"])}</b> ({score_pct}% match)</td>'
-                     f'<td style="font-size:12px">{_esc(r["reason"])}</td></tr>\n')
-        html += '</table></div>\n'
-
-    if stale_apps or redundant:
-        html += _knowledge_card(["orphaned_agent"])
-
-    # ── Action Plan (now that we have all data) ──
-    action_plan = _build_action_plan(criticals, warnings, spikes, offenders, stale_apps, redundant)
-    imm = action_plan["immediate"]
-    lt = action_plan["longterm"]
-
-    if imm or lt:
-        html += '</div><!-- /l3 -->\n'
-        # Action plan is always visible (outside detail toggle)
-        html += '<div style="margin-top:24px">\n'
-
-    if imm:
-        html += '<div class="focus-box" style="border-color:#dc2626">\n'
-        html += '<h2 id="actions" style="color:#dc2626;margin:0 0 12px">Immediate Fixes — stop the bleeding</h2>\n'
-        for i, a in enumerate(imm, 1):
-            html += f'<div class="focus-item" style="padding:8px 0;border-bottom:1px solid #f1f5f9">\n'
-            html += f'<div><b>{i}. {_esc(a["action"])}</b> <span style="color:#94a3b8;font-size:12px">({a["effort"]})</span></div>\n'
-            html += f'<div style="font-size:13px;color:#475569;margin-top:2px">{_esc(a["impact"])}</div>\n'
-            if a.get("cmd"):
-                html += f'<div style="margin-top:4px"><span class="action-cmd">{_esc(a["cmd"][:120])}</span></div>\n'
-            html += '</div>\n'
-        html += '</div>\n'
-
-    if lt:
-        html += '<div class="focus-box" style="border-color:#0284c7">\n'
-        html += '<h2 style="color:#0284c7;margin:0 0 12px">Long-Term Wins — build a healthier system</h2>\n'
-        for i, a in enumerate(lt, 1):
-            html += f'<div class="focus-item" style="padding:8px 0;border-bottom:1px solid #f1f5f9">\n'
-            html += f'<div><b>{i}. {_esc(a["action"])}</b> <span style="color:#94a3b8;font-size:12px">({a["effort"]})</span></div>\n'
-            html += f'<div style="font-size:13px;color:#475569;margin-top:2px">{_esc(a["impact"])}</div>\n'
-            if a.get("cmd"):
-                html += f'<div style="margin-top:4px"><span class="action-cmd">{_esc(a["cmd"][:120])}</span></div>\n'
-            # For app removal long-term items, show the redundant pairs inline
-            if "uninstall" in a["action"].lower() and redundant:
-                html += '<div style="margin-top:6px;font-size:12px;color:#475569">\n'
-                for r in redundant[:3]:
-                    html += f'<div style="margin:2px 0">Remove <b>{_esc(r["unused"]["name"])}</b> → you use <b>{_esc(r["active"]["name"])}</b> ({r["reason"]})</div>\n'
-                html += '</div>\n'
-            html += '</div>\n'
-        html += '</div>\n'
-
-    if imm or lt:
-        html += '</div>\n'
-        html += '<div class="l3">\n'
-
-    # ── Info ──
-    if infos:
-        html += f'<h2>Info ({len(infos)})</h2>\n<div class="card">\n'
-        for item in infos[:8]:
-            html += f'<div class="finding" style="color:#475569">{_sev_badge("info")} {_esc(item["summary"])}</div>\n'
-        if len(infos) > 8:
-            html += f'<div style="color:#64748b;font-size:12px;padding:8px 0">...and {len(infos) - 8} more</div>\n'
-        html += '</div>\n'
-
-    # ── Trend ──
-    if trend:
-        arrow = {"improving": ("↑ improving", "trend-up"), "degrading": ("↓ degrading", "trend-down"),
-                 "stable": ("→ stable", "trend-flat")}.get(trend, ("?", ""))
-        html += f'<h2>Trend</h2>\n<div class="card trend-card"><span class="{arrow[1]}" style="font-size:16px">{arrow[0]}</span></div>\n'
-
-    html += '</div><!-- /l3 -->\n</div><!-- /l2 -->\n'
-
-    html += '</div><!-- /main -->\n'
-    html += f"""
-<footer>apple-a-day v0.2.0 · {now_str} · {report.duration_ms}ms</footer>
-</body></html>"""
-    return html
+    template = env.get_template("report.html")
+    return template.render(
+        grade=grade, overall=overall, grade_color=grade_color,
+        now_str=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        duration_ms=report.duration_ms,
+        mac=info, cores=cores, ram_gb=ram_gb,
+        donut_svg=_donut_svg(overall, grade, grade_color),
+        bluf_text=_generate_bluf(criticals, warnings, infos, spikes),
+        criticals=criticals, warnings=warnings, infos=infos,
+        criticals_by_check=criticals_by_check_sorted,
+        dimensions=dimensions,
+        # Sysinfo
+        current_load=current_load, load_pct=load_pct, load_color=load_color,
+        swap_gb=swap_gb, swap_pct=swap_pct, swap_color=swap_color,
+        disk_used_gb=disk_used_gb, disk_total_gb=disk_total_gb, disk_pct=disk_pct, disk_color=disk_color,
+        uptime=_get_uptime(),
+        # Load
+        load_values=load_values,
+        load_peak=max(load_values) if load_values else 0,
+        load_avg=sum(load_values) / len(load_values) if load_values else 0,
+        sparkline_svg=_sparkline_svg(load_values, width=780, height=70) if load_values else "",
+        spikes=spikes,
+        # Pressure
+        sustained=sustained, transient=transient,
+        max_sustained_cpu=max(o["total_cpu"] for o in sustained) if sustained else 1,
+        max_transient_peak=max(o["peak_cpu"] for o in transient[:5]) if transient else 1,
+        # Hogs
+        daemon_hogs=daemon_hogs, app_cpu_hogs=app_cpu_hogs, mem_hogs=mem_hogs,
+        max_daemon_cpu=max(float(p["cpu"]) for p in daemon_hogs) if daemon_hogs else 1,
+        max_app_cpu=max(float(p["cpu"]) for p in app_cpu_hogs) if app_cpu_hogs else 1,
+        max_mem_pct=max(float(p["mem"]) for p in mem_hogs) if mem_hogs else 1,
+        # Cleanup
+        stale_apps=stale_apps, remove_candidates=remove_candidates,
+        scatterplot_svg=_cleanup_scatterplot(stale_apps),
+        max_remove_size=max(a.get("size_mb", 1) for a in remove_candidates) if remove_candidates else 1,
+        # Redundancy
+        redundant=redundant,
+        # Actions
+        immediate=action_plan["immediate"], longterm=action_plan["longterm"],
+        # Trend
+        trend=trend,
+    )
 
 
 def open_report(vitals_minutes: int = 60) -> Path:
@@ -1212,43 +637,3 @@ def open_report(vitals_minutes: int = 60) -> Path:
     report_path.write_text(html)
     webbrowser.open(f"file://{report_path}")
     return report_path
-
-
-# ── Trade-off framing ──
-
-def _get_tradeoff(finding: dict) -> dict[str, str] | None:
-    """Return gain/lose framing for actionable findings."""
-    summary = finding["summary"].lower()
-    check = finding["check"]
-
-    if "swap" in summary:
-        return {
-            "gain": "Faster app switching, no more random freezes, reduced SSD wear",
-            "lose": "Need to close some apps or reboot — temporary disruption",
-        }
-    if "disk" in check.lower() and ("full" in summary or "free" in summary):
-        return {
-            "gain": "Faster writes, swap can grow when needed, macOS updates work again",
-            "lose": "Time spent cleaning up files — run the cleanup suggestions above",
-        }
-    if "crash" in summary and "loop" not in summary:
-        return {
-            "gain": "Fewer background crashes, cleaner logs, less noise",
-            "lose": "May need to reinstall or update the crashing app",
-        }
-    if "orphaned" in summary:
-        return {
-            "gain": "Fewer wasted process spawns, cleaner launchd, less log noise",
-            "lose": "Nothing — these agents serve no purpose, their app is already gone",
-        }
-    if "outdated" in summary and "homebrew" in check.lower():
-        return {
-            "gain": "Security patches, bug fixes, compatibility with newer tools",
-            "lose": "Possible breaking changes — review changelogs before upgrading all at once",
-        }
-    if "crash-looping" in summary or "crash loop" in summary:
-        return {
-            "gain": "CPU freed from restart cycles, fewer kernel panic triggers",
-            "lose": "The service stops running — check if anything depends on it first",
-        }
-    return None

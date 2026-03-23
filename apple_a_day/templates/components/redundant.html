@@ -1,0 +1,19 @@
+{% if redundant %}
+<h2 id="redundant">Safe to Remove (you already have an alternative)</h2>
+<div class="card">
+  <div style="font-size:12px;color:#475569;margin-bottom:8px">These unused apps have an actively-used equivalent on your Mac.</div>
+  <table>
+    <tr><th>Unused App</th><th>Last Used</th><th>You Already Use</th><th>Why Similar</th></tr>
+    {% for r in redundant[:10] %}
+    {% set score_pct = (r.score * 100)|int %}
+    {% set color = '#16a34a' if score_pct >= 70 else '#ca8a04' %}
+    <tr>
+      <td><b>{{ r.unused.name }}</b></td>
+      <td>{{ r.unused.days_ago }}d ago</td>
+      <td style="color:{{ color }}"><b>{{ r.active.name }}</b> ({{ score_pct }}% match)</td>
+      <td style="font-size:12px">{{ r.reason }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}

@@ -1,0 +1,21 @@
+{% if criticals %}
+<h2 id="criticals" style="color:#dc2626">Critical Issues ({{ criticals|length }})</h2>
+<div class="card">
+  {% for check, items in criticals_by_check %}
+  <div class="finding">
+    {{ sev_badge('critical') }} <b>{{ check }}</b> — {{ items|length }} issue(s)
+    {% for item in items[:5] %}
+    <div style="margin-left:16px;font-size:13px;color:#334155;margin-top:4px">{{ item.summary }}</div>
+    {% endfor %}
+    {% if items|length > 5 %}
+    <div style="margin-left:16px;font-size:12px;color:#64748b">...and {{ items|length - 5 }} more</div>
+    {% endif %}
+    {% if items[0].fix %}
+    <div class="finding-fix">→ {{ items[0].fix }}</div>
+    {% endif %}
+    {% set topics = match_topics(items[0].summary, check) %}
+    {% if topics %}{{ knowledge_card(topics) }}{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

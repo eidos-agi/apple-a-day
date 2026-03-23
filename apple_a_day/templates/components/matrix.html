@@ -1,0 +1,9 @@
+<h2 id="matrix">Health Matrix</h2>
+{% for dim in dimensions %}
+<div class="matrix-row">
+  <span class="matrix-label">{{ dim.label }}</span>
+  {{ dim.bar_svg }}
+  <span class="matrix-val">{{ dim.value }}</span>
+  {% if dim.issue %}<span class="matrix-issue">{{ dim.issue[:60] }}</span>{% endif %}
+</div>
+{% endfor %}

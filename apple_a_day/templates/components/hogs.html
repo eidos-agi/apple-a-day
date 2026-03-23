@@ -1,0 +1,50 @@
+{% if daemon_hogs %}
+<h2 id="hogs">Daemon Hogs (background services)</h2>
+<div class="card">
+  <div style="font-size:12px;color:#64748b;margin-bottom:8px">These are launchd-managed services or background scripts running without a visible app window.</div>
+  <table>
+    <tr><th>Service</th><th style="width:200px">CPU %</th><th>What it is</th></tr>
+    {% for p in daemon_hogs %}
+    <tr>
+      <td class="mono">{{ p.name }} <span style="color:#94a3b8">({{ p.pid }})</span></td>
+      <td>{{ cpu_bar(p.cpu, max_daemon_cpu) }}</td>
+      <td>{{ process_action(p.name, p.cmdline) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if app_cpu_hogs %}
+<h2>CPU Hogs (right now)</h2>
+<div class="card">
+  <table>
+    <tr><th>Process</th><th style="width:200px">CPU (of {{ cores * 100 }}% total)</th><th>MEM (of {{ ram_gb }} GB)</th><th>What it is</th></tr>
+    {% for p in app_cpu_hogs %}
+    <tr>
+      <td class="mono">{{ p.name }} <span style="color:#94a3b8">({{ p.pid }})</span></td>
+      <td>{{ cpu_bar(p.cpu, max_app_cpu) }}</td>
+      <td class="mono">{{ mem_gb(p.mem, ram_gb) }} GB</td>
+      <td>{{ process_action(p.name, p.cmdline) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
+{% if mem_hogs %}
+<h2>Memory Hogs (right now)</h2>
+<div class="card">
+  <table>
+    <tr><th>Process</th><th style="width:200px">MEM (of {{ ram_gb }} GB)</th><th>CPU</th><th>What it is</th></tr>
+    {% for p in mem_hogs %}
+    <tr>
+      <td class="mono">{{ p.name }} <span style="color:#94a3b8">({{ p.pid }})</span></td>
+      <td>{{ mem_bar(p.mem, max_mem_pct, ram_gb) }}</td>
+      <td class="mono">{{ p.cpu }}%</td>
+      <td>{{ process_action(p.name, p.cmdline) }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
