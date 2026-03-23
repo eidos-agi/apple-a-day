@@ -10,7 +10,7 @@
 <body>
 
 <div class="sidebar">
-  <div class="logo">🍎 aad</div>
+  <div class="logo">🍎 apple-a-day</div>
   <nav>
     <div class="nav-label">Overview</div>
     <a href="#bluf">BLUF</a>
@@ -27,14 +27,14 @@
     <a href="#cleanup">App Cleanup</a>
     <a href="#redundant">Redundant Apps</a>
   </nav>
-  <div class="apple-progress">
-    <div class="apple-track"><span class="apple-dot" id="appleDot">🍎</span></div>
-  </div>
 </div>
 
 <div class="main">
 
-{% include 'components/pills.html' %}
+<div class="top-rail">
+  {% include 'components/pills.html' %}
+</div>
+
 {% include 'components/header.html' %}
 {% include 'components/bluf.html' %}
 {% include 'components/sysinfo.html' %}
@@ -71,6 +71,10 @@
 <footer>🍏 apple-a-day v0.2.0 · {{ now_str }} · {{ duration_ms }}ms</footer>
 
 </div><!-- /main -->
+
+<div class="apple-progress">
+  <div class="apple-track"><span class="apple-dot" id="appleDot">🍎</span></div>
+</div>
 
 <script>
 {% include 'script.js' %}

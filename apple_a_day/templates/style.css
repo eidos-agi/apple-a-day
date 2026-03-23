@@ -1,36 +1,37 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #faf9f6; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 0; margin: 0; font-size: 14px; line-height: 1.5; display: flex; }
+body { background: #faf9f6; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 0; margin: 0; font-size: 14px; line-height: 1.5; }
 code, .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }
 h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
 h2 { font-size: 15px; font-weight: 600; color: #475569; margin: 28px 0 12px; border-bottom: 1px solid #e7e5e0; padding-bottom: 6px; }
 
-/* Sidebar */
+/* Sidebar — fixed left nav */
 .sidebar { position: fixed; left: 0; top: 0; width: 180px; height: 100vh; background: #fff; border-right: 1px solid #e7e5e0; padding: 20px 12px; overflow-y: auto; z-index: 10; }
-.sidebar .logo { font-size: 20px; font-weight: 700; color: #1a3a1a; margin-bottom: 16px; padding: 0 8px; }
+.sidebar .logo { font-size: 14px; font-weight: 700; color: #1a3a1a; margin-bottom: 16px; padding: 0 8px; }
 .sidebar nav { font-size: 12px; }
 .sidebar nav a { display: block; padding: 5px 10px; color: #64748b; text-decoration: none; border-radius: 4px; margin: 1px 0; transition: all 0.1s; }
 .sidebar nav a:hover { background: #f0f7f0; color: #1a3a1a; }
 .sidebar nav a.active { background: #1a3a1a; color: #fff; }
 .sidebar nav .nav-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; padding: 10px 10px 3px; }
 
-/* Apple progress */
-.apple-progress { position: fixed; left: 0; bottom: 0; width: 180px; height: 48px; background: #fff; border-top: 1px solid #e7e5e0; border-right: 1px solid #e7e5e0; display: flex; align-items: center; padding: 0 16px; z-index: 11; }
-.apple-track { flex: 1; height: 4px; background: #e7e5e0; border-radius: 2px; position: relative; }
-.apple-dot { position: absolute; top: -10px; font-size: 20px; transition: left 0.15s; }
+/* Main content — centered in right half */
+.main { margin-left: 180px; padding: 0 24px 24px; display: flex; flex-direction: column; align-items: center; }
+.main > * { width: 100%; max-width: 780px; }
 
-/* Main content */
-.main { margin-left: 180px; flex: 1; min-width: 0; max-width: 860px; padding: 24px; }
-.layout { display: block; }
-
-/* Level pills */
-.level-pills { display: flex; gap: 0; margin-bottom: 20px; background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; overflow: hidden; }
-.level-pill { flex: 1; padding: 10px 16px; text-align: center; cursor: pointer; font-size: 13px; font-weight: 500; color: #64748b; border-right: 1px solid #e7e5e0; transition: all 0.15s; user-select: none; }
+/* Top rail — sticky level pills across top of main area */
+.top-rail { position: sticky; top: 0; z-index: 5; background: #faf9f6; padding: 12px 0 8px; border-bottom: 1px solid #e7e5e0; margin-bottom: 16px; }
+.level-pills { display: flex; gap: 0; background: #fff; border: 1px solid #e7e5e0; border-radius: 6px; overflow: hidden; }
+.level-pill { flex: 1; padding: 6px 12px; text-align: center; cursor: pointer; font-size: 12px; font-weight: 500; color: #64748b; border-right: 1px solid #e7e5e0; transition: all 0.15s; user-select: none; }
 .level-pill:last-child { border-right: none; }
 .level-pill:hover { background: #f8f7f4; }
 .level-pill.active { background: #1a3a1a; color: #fff; }
-.level-pill .pill-desc { font-size: 11px; font-weight: 400; display: block; margin-top: 1px; }
+.level-pill .pill-desc { display: none; }
 .l2 { display: none; }
 .l3 { display: none; }
+
+/* Apple progress — bottom of main area */
+.apple-progress { position: fixed; bottom: 0; left: 180px; right: 0; height: 36px; background: #fff; border-top: 1px solid #e7e5e0; display: flex; align-items: center; padding: 0 calc(50% - 390px); z-index: 5; }
+.apple-track { width: 100%; max-width: 780px; height: 4px; background: #e7e5e0; border-radius: 2px; position: relative; margin: 0 auto; }
+.apple-dot { position: absolute; top: -12px; font-size: 20px; transition: left 0.15s; }
 
 /* Header */
 .header { background: linear-gradient(135deg, #f0f7f0 0%, #fff 60%); border: 1px solid #d4e5d4; border-radius: 8px; padding: 20px 24px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
@@ -49,7 +50,7 @@ h2 { font-size: 15px; font-weight: 600; color: #475569; margin: 28px 0 12px; bor
 .bluf-count.info { background: #eff6ff; color: #1e40af; }
 
 /* System info */
-.sysinfo { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.sysinfo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
 .sysinfo-item { background: #fff; border: 1px solid #e7e5e0; border-radius: 6px; padding: 12px 16px; text-align: center; }
 .sysinfo-val { font-size: 18px; font-weight: 700; color: #0f172a; font-family: 'SF Mono', monospace; }
 .sysinfo-denom { font-size: 12px; font-weight: 400; color: #94a3b8; }
@@ -62,8 +63,8 @@ h2 { font-size: 15px; font-weight: 600; color: #475569; margin: 28px 0 12px; bor
 
 /* Matrix */
 .matrix-row { display: flex; align-items: center; margin: 6px 0; flex-wrap: nowrap; overflow: hidden; }
-.matrix-label { width: 90px; font-size: 13px; color: #475569; }
-.matrix-val { font-size: 13px; color: #64748b; margin-left: 8px; width: 30px; text-align: right; font-family: 'SF Mono', monospace; }
+.matrix-label { width: 90px; font-size: 13px; color: #475569; flex-shrink: 0; }
+.matrix-val { font-size: 13px; color: #64748b; margin-left: 8px; width: 30px; text-align: right; font-family: 'SF Mono', monospace; flex-shrink: 0; }
 .matrix-issue { font-size: 12px; color: #64748b; margin-left: 8px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Tables */
@@ -78,10 +79,6 @@ code { word-break: break-all; }
 .finding { padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
 .finding:last-child { border-bottom: none; }
 .finding-fix { font-size: 13px; color: #475569; margin-top: 6px; padding-left: 16px; border-left: 2px solid #e7e5e0; word-wrap: break-word; overflow-wrap: break-word; }
-
-/* Offenders */
-.offender { display: flex; align-items: center; margin: 6px 0; font-size: 13px; }
-.offender-name { width: 200px; color: #1e293b; font-family: 'SF Mono', monospace; }
 
 /* Focus / actions */
 .focus-box { background: #fff; border: 2px solid #5a9a5a; border-radius: 8px; padding: 20px; margin: 20px 0; }
@@ -117,8 +114,13 @@ code { word-break: break-all; }
 .trend-down { color: #dc2626; }
 .trend-flat { color: #64748b; }
 
-/* Footer */
-footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e7e5e0; font-size: 11px; color: #94a3b8; text-align: center; }
+/* Footer — above apple progress */
+footer { margin-top: 32px; padding: 16px 0 52px; border-top: 1px solid #e7e5e0; font-size: 11px; color: #94a3b8; text-align: center; }
 
 /* Responsive */
-@media (max-width: 900px) { .sidebar { display: none; } .main { margin-left: 0; } .apple-progress { display: none; } }
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; }
+  .apple-progress { left: 0; }
+  .sysinfo { grid-template-columns: repeat(2, 1fr); }
+}
