@@ -350,8 +350,8 @@ def _identify_from_cmdline(cmdline: str, name: str) -> str:
                 return f'Daemon: <code>{_esc(service)}</code> — <span class="action-cmd">launchctl list | grep {_esc(service)}</span>'
 
     # Generic: show truncated command line so the user can at least see what it is
-    short_cmd = cmdline[:120]
-    if len(cmdline) > 120:
+    short_cmd = cmdline[:80]
+    if len(cmdline) > 80:
         short_cmd += "..."
     return f'<code style="font-size:11px;color:#475569">{_esc(short_cmd)}</code>'
 
@@ -622,13 +622,16 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
   .trend-up {{ color: #16a34a; }}
   .trend-down {{ color: #dc2626; }}
   .trend-flat {{ color: #64748b; }}
-  table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }}
   th {{ text-align: left; padding: 8px 12px; color: #475569; font-weight: 600; border-bottom: 2px solid #e2e8f0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }}
-  td {{ padding: 6px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }}
+  td {{ padding: 6px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; word-wrap: break-word; overflow-wrap: break-word; }}
   tr:hover {{ background: #f8fafc; }}
   .mono {{ font-family: 'SF Mono', monospace; font-size: 12px; }}
-  .action-cmd {{ background: #f1f5f9; padding: 2px 8px; border-radius: 3px; font-family: 'SF Mono', monospace; font-size: 11px; color: #334155; display: inline-block; margin-top: 2px; }}
-  .matrix-issue {{ font-size: 12px; color: #64748b; margin-left: 8px; flex: 1; }}
+  code {{ word-break: break-all; }}
+  .action-cmd {{ background: #f1f5f9; padding: 2px 8px; border-radius: 3px; font-family: 'SF Mono', monospace; font-size: 11px; color: #334155; display: inline-block; margin-top: 2px; word-break: break-all; }}
+  .finding-fix {{ word-wrap: break-word; overflow-wrap: break-word; }}
+  .matrix-issue {{ font-size: 12px; color: #64748b; margin-left: 8px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+  .matrix-row {{ flex-wrap: nowrap; overflow: hidden; }}
   footer {{ margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }}
 </style>
 </head>
