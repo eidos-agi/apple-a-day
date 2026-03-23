@@ -735,10 +735,22 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
   .finding-fix {{ word-wrap: break-word; overflow-wrap: break-word; }}
   .matrix-issue {{ font-size: 12px; color: #64748b; margin-left: 8px; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
   .matrix-row {{ flex-wrap: nowrap; overflow: hidden; }}
-  .detail-toggle {{ display: flex; align-items: center; gap: 8px; margin-bottom: 20px; padding: 10px 16px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; cursor: pointer; font-size: 13px; color: #475569; user-select: none; }}
-  .detail-toggle input {{ width: 16px; height: 16px; accent-color: #0284c7; }}
-  .detail-section {{ display: none; }}
-  .detail-section.visible {{ display: block; }}
+  .level-pills {{ display: flex; gap: 0; margin-bottom: 20px; background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; overflow: hidden; }}
+  .level-pill {{ flex: 1; padding: 10px 16px; text-align: center; cursor: pointer; font-size: 13px; font-weight: 500; color: #64748b; border-right: 1px solid #e7e5e0; transition: all 0.15s; user-select: none; }}
+  .level-pill:last-child {{ border-right: none; }}
+  .level-pill:hover {{ background: #f8f7f4; }}
+  .level-pill.active {{ background: #1a3a1a; color: #fff; }}
+  .level-pill .pill-desc {{ font-size: 11px; font-weight: 400; display: block; margin-top: 1px; }}
+  .l2 {{ display: none; }}
+  .l3 {{ display: none; }}
+  .layout {{ display: flex; gap: 24px; }}
+  .main {{ flex: 1; min-width: 0; }}
+  .sidebar {{ width: 160px; flex-shrink: 0; position: sticky; top: 16px; align-self: flex-start; }}
+  .sidebar nav {{ background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; padding: 12px; font-size: 12px; }}
+  .sidebar nav a {{ display: block; padding: 4px 8px; color: #64748b; text-decoration: none; border-radius: 4px; margin: 1px 0; }}
+  .sidebar nav a:hover {{ background: #f0f7f0; color: #1a3a1a; }}
+  .sidebar nav .nav-label {{ font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; padding: 8px 8px 2px; }}
+  @media (max-width: 900px) {{ .sidebar {{ display: none; }} }}
   footer {{ margin-top: 32px; padding-top: 16px; border-top: 1px solid #e7e5e0; font-size: 11px; color: #94a3b8; text-align: center; }}
   footer::before {{ content: "🍏 "; }}
 </style>
@@ -753,7 +765,7 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
   <div>{_donut_svg(overall, grade, grade_color)}</div>
 </div>
 
-<div class="bluf">
+<div class="bluf" id="bluf">
   <div class="bluf-label">Bottom Line Up Front</div>
   <div class="bluf-summary">{bluf_text}</div>
   <div class="bluf-counts">
@@ -790,7 +802,7 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     load_pct = int(current_load / cores * 100) if cores else 0
     load_color = "#ef4444" if load_pct > 200 else "#ca8a04" if load_pct > 100 else "#22c55e"
 
-    html += f"""<div class="sysinfo">
+    html += f"""<div class="sysinfo" id="sysinfo">
   <div class="sysinfo-item">
     <div class="sysinfo-val">{current_load:.0f} <span class="sysinfo-denom">/ {cores}</span></div>
     <div class="sysinfo-label">Load / Cores</div>
@@ -813,16 +825,46 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
 </div>
 """
 
-    # ── Detail toggle ──
-    html += """<label class="detail-toggle">
-  <input type="checkbox" id="detailToggle" onchange="document.querySelectorAll('.detail-section').forEach(s => s.classList.toggle('visible', this.checked))">
-  Show detailed analysis
-</label>
+    # ── Level pills ──
+    html += """<div class="level-pills">
+  <div class="level-pill active" onclick="setLevel(1)">Summary<span class="pill-desc">Score + actions</span></div>
+  <div class="level-pill" onclick="setLevel(2)">Standard<span class="pill-desc">+ issues &amp; pressure</span></div>
+  <div class="level-pill" onclick="setLevel(3)">Full Detail<span class="pill-desc">+ tables &amp; charts</span></div>
+</div>
+<script>
+function setLevel(n) {
+  document.querySelectorAll('.level-pill').forEach((p, i) => p.classList.toggle('active', i === n - 1));
+  document.querySelectorAll('.l2').forEach(s => s.style.display = n >= 2 ? 'block' : 'none');
+  document.querySelectorAll('.l3').forEach(s => s.style.display = n >= 3 ? 'block' : 'none');
+}
+</script>
+"""
+
+    # ── Sidebar nav ──
+    html += """<div class="layout">
+<div class="sidebar"><nav>
+  <div class="nav-label">Overview</div>
+  <a href="#bluf">BLUF</a>
+  <a href="#sysinfo">System</a>
+  <a href="#actions">Actions</a>
+  <div class="nav-label">Level 2</div>
+  <a href="#matrix">Health Matrix</a>
+  <a href="#pressure">Pressure</a>
+  <a href="#criticals">Critical Issues</a>
+  <div class="nav-label">Level 3</div>
+  <a href="#load">Load History</a>
+  <a href="#hogs">Process Hogs</a>
+  <a href="#warnings">Warnings</a>
+  <a href="#cleanup">App Cleanup</a>
+  <a href="#redundant">Redundant Apps</a>
+</nav></div>
+<div class="main">
 """
 
     # ── Action Plan (rendered later, after stale_apps/redundant are available) ──
     # Placeholder — the actual rendering happens below after data collection
 
+    html += '<div class="l2">\n'
     # ── Health Matrix (with worst finding per dimension) ──
     # Map dimensions to check names for finding lookup
     dim_check_map = {
@@ -841,7 +883,7 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
                 dim_worst[dim] = item["summary"]
                 break
 
-    html += '<h2>Health Matrix</h2>\n'
+    html += '<h2 id="matrix">Health Matrix</h2>\n'
     for dim, label in [("stability", "Stability"), ("cpu", "CPU"), ("thermal", "Thermal"),
                        ("memory", "Memory"), ("storage", "Storage"), ("services", "Services"),
                        ("security", "Security"), ("infra", "Infra"), ("network", "Network")]:
@@ -850,13 +892,14 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
         issue_html = f'<span class="matrix-issue">{_esc(issue[:60])}</span>' if issue else ""
         html += f'<div class="matrix-row"><span class="matrix-label">{label}</span>{_bar_svg(val)}<span class="matrix-val">{val}</span>{issue_html}</div>\n'
 
+    html += '<div class="l3">\n'
     # ── Load Sparkline ──
     if samples:
         load_values = [s["load"][0] for s in samples if "load" in s]
         if load_values:
             peak = max(load_values)
             avg = sum(load_values) / len(load_values)
-            html += '<h2>Load History</h2>\n<div class="spark-container">\n'
+            html += '<h2 id="load">Load History</h2>\n<div class="spark-container">\n'
             html += _sparkline_svg(load_values, width=780, height=70)
             html += f'<div class="spark-stats"><span>peak: <b>{peak:.0f}</b></span><span>avg: <b>{avg:.1f}</b></span><span>cores: <b>{cores}</b></span><span>samples: <b>{len(load_values)}</b></span></div>\n'
             html += '</div>\n'
@@ -867,13 +910,14 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
                     html += f'<div class="spike">▲ spike peak <b>{s["peak_load"]:.0f}x</b> — {_esc(procs)}{ongoing}</div>\n'
             html += _knowledge_card(["load_average"])
 
-    # ── Sustained Pressure (from vitals time-series) ──
+    html += '</div><!-- /l3 -->\n'
+    # ── Sustained Pressure (from vitals time-series) — L2 ──
     if offenders:
         sustained = [o for o in offenders if o.get("sustained")]
         transient = [o for o in offenders if not o.get("sustained")]
 
         if sustained:
-            html += '<h2>Sustained Pressure (long-running load)</h2>\n<div class="card">\n'
+            html += '<h2 id="pressure">Sustained Pressure (long-running load)</h2>\n<div class="card">\n'
             html += '<div style="font-size:12px;color:#64748b;margin-bottom:8px">Processes consuming CPU across >50% of the monitoring window. These cause crashes, not spikes.</div>\n'
             max_total = max(o["total_cpu"] for o in sustained) if sustained else 1
             html += '<table><tr><th>Process</th><th style="width:200px">Cumulative CPU</th><th>Avg CPU</th><th>Present</th><th>Pattern</th></tr>\n'
@@ -902,13 +946,14 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     # ── Live Process Tables (CPU, Memory) ──
     cpu_hogs, mem_hogs = _get_live_process_tables()
 
+    html += '<div class="l3">\n'
     # Split processes into daemons vs regular
     daemon_hogs = [p for p in cpu_hogs if _is_daemon(p.get("cmdline", ""))]
     app_cpu_hogs = [p for p in cpu_hogs if not _is_daemon(p.get("cmdline", ""))]
 
     if daemon_hogs:
         max_cpu_d = max(float(p["cpu"]) for p in daemon_hogs)
-        html += '<h2>Daemon Hogs (background services)</h2>\n<div class="card">\n'
+        html += '<h2 id="hogs">Daemon Hogs (background services)</h2>\n<div class="card">\n'
         html += '<div style="font-size:12px;color:#64748b;margin-bottom:8px">These are launchd-managed services or background scripts running without a visible app window.</div>\n'
         html += '<table><tr><th>Service</th><th style="width:200px">CPU %</th><th>What it is</th></tr>\n'
         for p in daemon_hogs:
@@ -948,9 +993,10 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
             html += f'<tr><td class="mono">{_esc(p["name"])} <span style="color:#94a3b8">({p["pid"]})</span></td><td>{bar}</td><td class="mono">{p["cpu"]}%</td><td>{identity}</td></tr>\n'
         html += '</table></div>\n'
 
-    # ── Critical Issues ──
+    html += '</div><!-- /l3 hog tables -->\n'
+    # ── Critical Issues ── (L2)
     if criticals:
-        html += f'<h2 style="color:#dc2626">Critical Issues ({len(criticals)})</h2>\n<div class="card">\n'
+        html += f'<h2 id="criticals" style="color:#dc2626">Critical Issues ({len(criticals)})</h2>\n<div class="card">\n'
         by_check: dict[str, list] = {}
         for c in criticals:
             by_check.setdefault(c["check"], []).append(c)
@@ -972,11 +1018,11 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
             html += '</div>\n'
         html += '</div>\n'
 
-    html += '<div class="detail-section">\n'
+    html += '<div class="l3">\n'
 
     # ── Warnings with trade-off framing ──
     if warnings:
-        html += f'<h2 style="color:#92400e">Warnings ({len(warnings)})</h2>\n<div class="card">\n'
+        html += f'<h2 id="warnings" style="color:#92400e">Warnings ({len(warnings)})</h2>\n<div class="card">\n'
         topics_shown_w: set[str] = set()
         for w_item in warnings:
             html += f'<div class="finding">{_sev_badge("warning")} {_esc(w_item["summary"])}\n'
@@ -1022,7 +1068,7 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
         all_apps_for_sim.append({"name": name, "path": app_path, "days_ago": days_ago})
     redundant = find_redundant_apps(all_apps_for_sim)
     if stale_apps:
-        html += '<h2>App Cleanup Analysis</h2>\n<div class="card">\n'
+        html += '<h2 id="cleanup">App Cleanup Analysis</h2>\n<div class="card">\n'
         html += '<div style="font-size:13px;color:#475569;margin-bottom:8px">Apps plotted by size (impact) vs. time since last use. Top-right quadrant = high impact, rarely used — best removal candidates.</div>\n'
         html += _cleanup_scatterplot(stale_apps)
         # Companion table — actionable list
@@ -1044,7 +1090,7 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
 
     # ── Redundant Apps (you already have something better) ──
     if redundant:
-        html += '<h2>Safe to Remove (you already have an alternative)</h2>\n<div class="card">\n'
+        html += '<h2 id="redundant">Safe to Remove (you already have an alternative)</h2>\n<div class="card">\n'
         html += '<div style="font-size:12px;color:#475569;margin-bottom:8px">These unused apps have an actively-used equivalent on your Mac.</div>\n'
         html += '<table><tr><th>Unused App</th><th>Last Used</th><th>You Already Use</th><th>Why Similar</th></tr>\n'
         for r in redundant[:10]:
@@ -1067,13 +1113,13 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     lt = action_plan["longterm"]
 
     if imm or lt:
-        html += '</div><!-- close detail-section before action plan -->\n'
+        html += '</div><!-- /l3 -->\n'
         # Action plan is always visible (outside detail toggle)
         html += '<div style="margin-top:24px">\n'
 
     if imm:
         html += '<div class="focus-box" style="border-color:#dc2626">\n'
-        html += '<h2 style="color:#dc2626;margin:0 0 12px">Immediate Fixes — stop the bleeding</h2>\n'
+        html += '<h2 id="actions" style="color:#dc2626;margin:0 0 12px">Immediate Fixes — stop the bleeding</h2>\n'
         for i, a in enumerate(imm, 1):
             html += f'<div class="focus-item" style="padding:8px 0;border-bottom:1px solid #f1f5f9">\n'
             html += f'<div><b>{i}. {_esc(a["action"])}</b> <span style="color:#94a3b8;font-size:12px">({a["effort"]})</span></div>\n'
@@ -1103,7 +1149,7 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
 
     if imm or lt:
         html += '</div>\n'
-        html += '<div class="detail-section">\n'  # re-open detail section for remaining content
+        html += '<div class="l3">\n'
 
     # ── Info ──
     if infos:
@@ -1120,8 +1166,9 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
                  "stable": ("→ stable", "trend-flat")}.get(trend, ("?", ""))
         html += f'<h2>Trend</h2>\n<div class="card trend-card"><span class="{arrow[1]}" style="font-size:16px">{arrow[0]}</span></div>\n'
 
-    html += '</div><!-- end detail-section -->\n'
+    html += '</div><!-- /l3 -->\n</div><!-- /l2 -->\n'
 
+    html += '</div><!-- /main --></div><!-- /layout -->\n'
     html += f"""
 <footer>apple-a-day v0.2.0 · {now_str} · {report.duration_ms}ms</footer>
 </body></html>"""
