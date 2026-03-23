@@ -588,29 +588,43 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     # ── Top Offenders (vitals history) ──
     if offenders:
         html += '<h2>Top Resource Offenders (from vitals history)</h2>\n<div class="card">\n'
-        html += '<table><tr><th>Process</th><th>Seen in top-CPU</th><th>Peak CPU</th><th>Action</th></tr>\n'
+        max_peak = max(o["peak_cpu"] for o in offenders[:7]) if offenders else 100
+        html += '<table><tr><th>Process</th><th style="width:200px">Peak CPU</th><th>Seen</th><th>Action</th></tr>\n'
         for o in offenders[:7]:
             action = _process_action(o["name"])
-            html += f'<tr><td class="mono">{_esc(o["name"])}</td><td>{o["appearances"]}x</td><td>{o["peak_cpu"]}%</td><td>{action}</td></tr>\n'
+            bar_w = int(o["peak_cpu"] / max(max_peak, 1) * 140)
+            color = "#ef4444" if o["peak_cpu"] > 50 else "#ca8a04" if o["peak_cpu"] > 20 else "#0284c7"
+            bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{o["peak_cpu"]}%</span></div>'
+            html += f'<tr><td class="mono">{_esc(o["name"])}</td><td>{bar}</td><td>{o["appearances"]}x</td><td>{action}</td></tr>\n'
         html += '</table></div>\n'
 
     # ── Live Process Tables (CPU, Memory) ──
     cpu_hogs, mem_hogs = _get_live_process_tables()
 
     if cpu_hogs:
+        max_cpu = max(float(p["cpu"]) for p in cpu_hogs) if cpu_hogs else 100
         html += '<h2>CPU Hogs (right now)</h2>\n<div class="card">\n'
-        html += '<table><tr><th>Process</th><th>CPU %</th><th>MEM %</th><th>PID</th><th>Action</th></tr>\n'
+        html += '<table><tr><th>Process</th><th style="width:220px">CPU %</th><th>MEM %</th><th>PID</th><th>Action</th></tr>\n'
         for p in cpu_hogs:
             action = _process_action(p["name"])
-            html += f'<tr><td class="mono">{_esc(p["name"])}</td><td><b>{p["cpu"]}</b></td><td>{p["mem"]}</td><td class="mono">{p["pid"]}</td><td>{action}</td></tr>\n'
+            cpu_val = float(p["cpu"])
+            bar_w = int(cpu_val / max(max_cpu, 1) * 160)
+            color = "#ef4444" if cpu_val > 50 else "#ca8a04" if cpu_val > 20 else "#0284c7"
+            bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{p["cpu"]}%</span></div>'
+            html += f'<tr><td class="mono">{_esc(p["name"])}</td><td>{bar}</td><td class="mono">{p["mem"]}%</td><td class="mono">{p["pid"]}</td><td>{action}</td></tr>\n'
         html += '</table></div>\n'
 
     if mem_hogs:
+        max_mem = max(float(p["mem"]) for p in mem_hogs) if mem_hogs else 100
         html += '<h2>Memory Hogs (right now)</h2>\n<div class="card">\n'
-        html += '<table><tr><th>Process</th><th>MEM %</th><th>CPU %</th><th>PID</th><th>Action</th></tr>\n'
+        html += '<table><tr><th>Process</th><th style="width:220px">MEM %</th><th>CPU %</th><th>PID</th><th>Action</th></tr>\n'
         for p in mem_hogs:
             action = _process_action(p["name"])
-            html += f'<tr><td class="mono">{_esc(p["name"])}</td><td><b>{p["mem"]}</b></td><td>{p["cpu"]}</td><td class="mono">{p["pid"]}</td><td>{action}</td></tr>\n'
+            mem_val = float(p["mem"])
+            bar_w = int(mem_val / max(max_mem, 1) * 160)
+            color = "#ef4444" if mem_val > 10 else "#ca8a04" if mem_val > 5 else "#0284c7"
+            bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{p["mem"]}%</span></div>'
+            html += f'<tr><td class="mono">{_esc(p["name"])}</td><td>{bar}</td><td class="mono">{p["cpu"]}%</td><td class="mono">{p["pid"]}</td><td>{action}</td></tr>\n'
         html += '</table></div>\n'
 
     # ── Critical Issues ──
@@ -668,12 +682,16 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
         # Companion table — actionable list
         remove_candidates = [a for a in stale_apps if a.get("days_ago", 0) > 90]
         if remove_candidates:
-            html += '<table style="margin-top:12px"><tr><th>App</th><th>Size</th><th>Last Used</th><th>Action</th></tr>\n'
+            max_size_rc = max(a.get("size_mb", 1) for a in remove_candidates[:10])
+            html += '<table style="margin-top:12px"><tr><th>App</th><th style="width:200px">Size</th><th>Last Used</th><th>Action</th></tr>\n'
             for a in remove_candidates[:10]:
                 size = a.get("size_mb", 0)
                 size_str = f"{size} MB" if size < 1024 else f"{size / 1024:.1f} GB"
+                bar_w = int(size / max(max_size_rc, 1) * 140)
+                color = "#ef4444" if size > 500 else "#ca8a04" if size > 100 else "#0284c7"
+                bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{size_str}</span></div>'
                 name = _esc(a["name"])
-                html += f'<tr><td>{name}</td><td class="mono">{size_str}</td><td>{a.get("last_used", "?")}</td>'
+                html += f'<tr><td>{name}</td><td>{bar}</td><td>{a.get("last_used", "?")}</td>'
                 html += f'<td><span class="action-cmd">sudo rm -rf "/Applications/{name}.app"</span></td></tr>\n'
             html += '</table>\n'
         html += '</div>\n'
