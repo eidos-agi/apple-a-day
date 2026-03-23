@@ -12,6 +12,8 @@ h2 { font-size: 15px; font-weight: 600; color: #475569; margin: 28px 0 12px; bor
 .sidebar nav a:hover { background: #f0f7f0; color: #1a3a1a; }
 .sidebar nav a.active { background: #1a3a1a; color: #fff; }
 .sidebar nav .nav-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; padding: 10px 10px 3px; }
+.sidebar nav .nav-l2 { display: none; }
+.sidebar nav .nav-l3 { display: none; }
 
 /* Main content — centered in right half */
 .main { margin-left: 180px; padding: 0 24px 24px; display: flex; flex-direction: column; align-items: center; }

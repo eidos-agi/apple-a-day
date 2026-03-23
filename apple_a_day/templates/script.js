@@ -3,6 +3,9 @@ function setLevel(n) {
   document.querySelectorAll('.level-pill').forEach((p, i) => p.classList.toggle('active', i === n - 1));
   document.querySelectorAll('.l2').forEach(s => s.classList.toggle('visible', n >= 2));
   document.querySelectorAll('.l3').forEach(s => s.classList.toggle('visible', n >= 3));
+  // Show/hide sidebar nav links to match
+  document.querySelectorAll('.sidebar .nav-l2').forEach(el => el.style.display = n >= 2 ? '' : 'none');
+  document.querySelectorAll('.sidebar .nav-l3').forEach(el => el.style.display = n >= 3 ? '' : 'none');
   window._currentLevel = n;
 }
 window._currentLevel = 1;
