@@ -76,13 +76,15 @@ def log_checkup(report, trigger: str | None = None) -> Path:
     # Score matrix: 7 dimensions, each 0-100
     # Maps check names → dimensions (some checks contribute to multiple)
     dimension_checks = {
-        "stability": ["Crash Loops", "Kernel Panics"],
+        "stability": ["Crash Loops", "Kernel Panics", "Shutdown Causes"],
         "memory": ["Memory Pressure"],
         "storage": ["Disk Health"],
         "services": ["Launch Agents"],
         "security": ["Security"],
         "infra": ["Dynamic Library Health", "Homebrew"],
         "network": ["Network"],
+        "cpu": ["CPU Load"],
+        "thermal": ["Thermal"],
     }
 
     # Score each check: 0 (critical found), 50 (warning), 80 (info only), 100 (all ok)
@@ -108,7 +110,9 @@ def log_checkup(report, trigger: str | None = None) -> Path:
     # Overall: weighted — stability and memory matter more than network
     weights = {
         "stability": 3,
+        "cpu": 3,
         "memory": 2,
+        "thermal": 2,
         "storage": 2,
         "services": 2,
         "security": 1,

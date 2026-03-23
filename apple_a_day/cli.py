@@ -189,6 +189,103 @@ def _cmd_trend(args):
             print(f"    \033[31m●\033[0m {issue}")
 
 
+def _cmd_report(args):
+    """Generate a focused health report."""
+    if args.html:
+        from .report_html import open_report
+        path = open_report(vitals_minutes=args.minutes)
+        print(f"Report opened: {path}")
+        return
+
+    if args.report_json:
+        from .report import generate_report
+        result = generate_report(as_json=True, vitals_minutes=args.minutes)
+        print(json.dumps(result, indent=2))
+        return
+
+    from .report import generate_report
+    print(generate_report(as_json=False, vitals_minutes=args.minutes))
+
+
+def _cmd_monitor(args):
+    """Run vitals monitor — single sample or continuous loop."""
+    from .vitals import run_monitor
+
+    if args.once:
+        s = run_monitor(once=True)
+        if args.monitor_json:
+            print(json.dumps(s, indent=2))
+        else:
+            load = s.get("load", [0, 0, 0])
+            top = s.get("top", [])
+            print(f"Sampled: load {load[0]:.1f}/{load[1]:.1f}/{load[2]:.1f}"
+                  f"  thermal={s.get('thermal', '?')}"
+                  f"  swap={s.get('swap_mb', '?')}MB")
+            if top:
+                for cpu, name in top[:3]:
+                    print(f"  {name}: {cpu}%")
+        return
+
+    # Continuous mode
+    print(f"Monitoring every {args.interval}s (Ctrl-C to stop)...")
+    run_monitor(interval=args.interval)
+
+
+def _cmd_vitals(args):
+    """Analyze vitals history — show spikes, trends, offenders."""
+    from .vitals import analyze_vitals
+
+    analysis = analyze_vitals(minutes=args.minutes)
+
+    if not analysis.get("samples"):
+        print("No vitals data yet. Run `aad monitor --once` or start the monitor.")
+        return
+
+    if args.vitals_json:
+        print(json.dumps(analysis, indent=2))
+        return
+
+    load = analysis.get("load", {})
+    thermal = analysis.get("thermal", {})
+    swap = analysis.get("swap", {})
+    spikes = load.get("spikes", [])
+    offenders = analysis.get("worst_offenders", [])
+
+    print(f"\napple-a-day vitals ({analysis['samples']} samples, last {args.minutes}min)")
+    print(f"\n  Load: current {_fmt_load(load.get('current', []))}  "
+          f"peak {load.get('peak_1m', 0):.0f}  avg {load.get('avg_1m', 0):.1f}  "
+          f"({load.get('cores', '?')} cores)")
+
+    if spikes:
+        print(f"\n  \033[31m{len(spikes)} load spike(s) detected:\033[0m")
+        for s in spikes[:5]:
+            ongoing = " \033[31m(ONGOING)\033[0m" if s.get("ongoing") else ""
+            procs = ", ".join(f"{p[1]} ({p[0]}%)" for p in s.get("top_processes", []))
+            print(f"    peak {s['peak_load']:.0f}x  {s['start'][:19]}{ongoing}")
+            if procs:
+                print(f"      culprits: {procs}")
+
+    t_level = {0: "nominal", 1: "moderate", 2: "heavy", 3: "trapping", 4: "sleeping"}
+    print(f"\n  Thermal: current {t_level.get(thermal.get('current', 0), '?')}  "
+          f"peak {t_level.get(thermal.get('peak', 0), '?')}  "
+          f"above-nominal {thermal.get('time_above_nominal_pct', 0):.0f}% of time")
+
+    print(f"\n  Swap: current {swap.get('current_mb', '?')}MB  peak {swap.get('peak_mb', 0):.0f}MB")
+
+    if offenders:
+        print(f"\n  Top offenders (by frequency in top-CPU list):")
+        for o in offenders[:7]:
+            print(f"    {o['name']:30s}  seen {o['appearances']}x  peak {o['peak_cpu']}%")
+
+    print()
+
+
+def _fmt_load(load_list):
+    if not load_list:
+        return "?"
+    return "/".join(f"{l:.0f}" for l in load_list[:3])
+
+
 def _cmd_profile(args):
     """Show or refresh Mac user profile."""
     from .profile import get_or_create_profile
@@ -274,6 +371,23 @@ def main(argv=None):
     p_trend = sub.add_parser("trend", help="Show health trend from logs")
     p_trend.add_argument("--json", action="store_true", dest="trend_json", help="Output as JSON")
 
+    # report
+    p_report = sub.add_parser("report", help="Focused health report with ASCII graphs")
+    p_report.add_argument("--json", action="store_true", dest="report_json", help="Output as JSON")
+    p_report.add_argument("--html", action="store_true", help="Open report in browser")
+    p_report.add_argument("--minutes", type=int, default=60, help="Vitals lookback in minutes (default: 60)")
+
+    # monitor
+    p_monitor = sub.add_parser("monitor", help="Sample system vitals over time")
+    p_monitor.add_argument("--once", action="store_true", help="Take a single sample and exit")
+    p_monitor.add_argument("--interval", type=int, default=60, help="Seconds between samples (default: 60)")
+    p_monitor.add_argument("--json", action="store_true", dest="monitor_json", help="Output as JSON")
+
+    # vitals
+    p_vitals = sub.add_parser("vitals", help="Analyze recent vitals history")
+    p_vitals.add_argument("--minutes", type=int, default=60, help="Look back N minutes (default: 60)")
+    p_vitals.add_argument("--json", action="store_true", dest="vitals_json", help="Output as JSON")
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -285,15 +399,15 @@ def main(argv=None):
         args.min_severity = "ok"
         args.fields = None
 
-    if args.command == "checkup":
-        _cmd_checkup(args)
-    elif args.command == "schema":
-        _cmd_schema(args)
-    elif args.command == "profile":
-        _cmd_profile(args)
-    elif args.command == "score":
-        _cmd_score(args)
-    elif args.command == "log":
-        _cmd_log(args)
-    elif args.command == "trend":
-        _cmd_trend(args)
+    handlers = {
+        "checkup": _cmd_checkup,
+        "report": _cmd_report,
+        "schema": _cmd_schema,
+        "profile": _cmd_profile,
+        "score": _cmd_score,
+        "log": _cmd_log,
+        "trend": _cmd_trend,
+        "monitor": _cmd_monitor,
+        "vitals": _cmd_vitals,
+    }
+    handlers[args.command](args)
