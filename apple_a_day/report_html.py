@@ -844,9 +844,32 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
             html += '</div>\n'
         html += '</div>\n'
 
-    # ── App Cleanup Scatterplot ──
+    # ── App Cleanup Scatterplot + Redundancy Analysis ──
     from .checks.cleanup import _find_stale_apps
     stale_apps = _find_stale_apps()
+
+    # Find redundant apps (unused apps that have an active equivalent)
+    from .app_similarity import find_redundant_apps
+    import glob as _glob
+    all_apps_for_sim = []
+    for app_path in _glob.glob("/Applications/*.app"):
+        from .checks.cleanup import _get_last_used, _get_bundle_id, _SAFE_APPS
+        name = os.path.basename(app_path).replace(".app", "")
+        if name in _SAFE_APPS:
+            continue
+        last_used_str = _get_last_used(app_path)
+        if last_used_str:
+            from datetime import timezone
+            now_utc = datetime.now(timezone.utc)
+            try:
+                last_dt = datetime.fromisoformat(last_used_str.replace(" +0000", "+00:00"))
+                days_ago = (now_utc - last_dt).days
+            except ValueError:
+                days_ago = 999
+        else:
+            days_ago = 999
+        all_apps_for_sim.append({"name": name, "path": app_path, "days_ago": days_ago})
+    redundant = find_redundant_apps(all_apps_for_sim)
     if stale_apps:
         html += '<h2>App Cleanup Analysis</h2>\n<div class="card">\n'
         html += '<div style="font-size:13px;color:#475569;margin-bottom:8px">Apps plotted by size (impact) vs. time since last use. Top-right quadrant = high impact, rarely used — best removal candidates.</div>\n'
@@ -867,6 +890,24 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
                 html += f'<td><span class="action-cmd">sudo rm -rf "/Applications/{name}.app"</span></td></tr>\n'
             html += '</table>\n'
         html += '</div>\n'
+
+    # ── Redundant Apps (you already have something better) ──
+    if redundant:
+        html += '<h2>Safe to Remove (you already have an alternative)</h2>\n<div class="card">\n'
+        html += '<div style="font-size:12px;color:#475569;margin-bottom:8px">These unused apps have an actively-used equivalent on your Mac.</div>\n'
+        html += '<table><tr><th>Unused App</th><th>Last Used</th><th>You Already Use</th><th>Why Similar</th></tr>\n'
+        for r in redundant[:10]:
+            unused = r["unused"]
+            active = r["active"]
+            score_pct = int(r["score"] * 100)
+            color = "#16a34a" if score_pct >= 70 else "#ca8a04"
+            html += (f'<tr><td><b>{_esc(unused["name"])}</b></td>'
+                     f'<td>{unused.get("days_ago", "?")}d ago</td>'
+                     f'<td style="color:{color}"><b>{_esc(active["name"])}</b> ({score_pct}% match)</td>'
+                     f'<td style="font-size:12px">{_esc(r["reason"])}</td></tr>\n')
+        html += '</table></div>\n'
+
+    if stale_apps or redundant:
         html += _knowledge_card(["orphaned_agent"])
 
     # ── Info ──
