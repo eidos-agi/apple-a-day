@@ -199,9 +199,23 @@ def _cleanup_scatterplot(stale_apps: list[dict], width: int = 780, height: int =
 
 
 def _get_live_process_tables() -> tuple[list[dict], list[dict]]:
-    """Get current top CPU and memory consumers."""
+    """Get current top CPU and memory consumers with full command lines."""
     cpu_hogs = []
     mem_hogs = []
+
+    # Get full command lines for all PIDs in one shot
+    cmdlines: dict[str, str] = {}
+    try:
+        out = subprocess.run(["ps", "-eo", "pid,args"],
+                             capture_output=True, text=True, timeout=5)
+        if out.returncode == 0:
+            for line in out.stdout.strip().split("\n")[1:]:
+                parts = line.strip().split(None, 1)
+                if len(parts) == 2:
+                    cmdlines[parts[0]] = parts[1]
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+
     try:
         # CPU sorted
         out = subprocess.run(["ps", "-eo", "pid,pcpu,pmem,comm", "-r"],
@@ -216,7 +230,8 @@ def _get_live_process_tables() -> tuple[list[dict], list[dict]]:
                 if cpu_val < 5:
                     break
                 name = comm.rsplit("/", 1)[-1]
-                cpu_hogs.append({"pid": pid, "cpu": cpu, "mem": mem, "name": name})
+                cpu_hogs.append({"pid": pid, "cpu": cpu, "mem": mem, "name": name,
+                                 "cmdline": cmdlines.get(pid, "")})
 
         # Memory sorted
         out = subprocess.run(["ps", "-eo", "pid,pcpu,pmem,comm", "-m"],
@@ -231,38 +246,139 @@ def _get_live_process_tables() -> tuple[list[dict], list[dict]]:
                 if mem_val < 1.0:
                     break
                 name = comm.rsplit("/", 1)[-1]
-                mem_hogs.append({"pid": pid, "cpu": cpu, "mem": mem, "name": name})
+                mem_hogs.append({"pid": pid, "cpu": cpu, "mem": mem, "name": name,
+                                 "cmdline": cmdlines.get(pid, "")})
     except (subprocess.TimeoutExpired, OSError):
         pass
     return cpu_hogs, mem_hogs
 
 
-def _process_action(name: str) -> str:
-    """Suggest what to do about a resource-heavy process."""
-    known = {
+def _process_action(name: str, cmdline: str = "") -> str:
+    """Suggest what to do about a resource-heavy process, using its full command line."""
+    # System processes — specific advice, no kill command
+    system = {
         "WindowServer": "System process — cannot be killed. Reduce windows/displays.",
         "kernel_task": "Thermal management — reduce workload, check ventilation.",
-        "mds_stores": "Spotlight indexing — wait or exclude folders in System Settings → Siri & Spotlight.",
+        "mds_stores": "Spotlight indexing — wait, or exclude folders in System Settings → Siri & Spotlight.",
+        "mds": "Spotlight indexing — transient.",
         "fileproviderd": "Cloud sync (OneDrive/iCloud) — pause sync or reduce sync folders.",
         "trustd": "Certificate validation — transient, resolves after sync completes.",
         "XprotectService": "Security scan — transient, let it finish.",
         "mediaanalysisd": "Photo/video analysis — transient background task.",
         "bird": "iCloud sync daemon — pause iCloud or wait.",
-        "OneDrive": "OneDrive sync — pause in menu bar or reduce sync scope.",
-        "Dropbox": "Dropbox sync — pause in menu bar.",
-        "Docker Desktop": "Docker VM — check resource limits in Docker Desktop → Settings → Resources.",
-        "prl_client_app": "Parallels VM — suspend or shut down the VM.",
-        "node": "Node.js process — check which dev server is running.",
-        "python3": "Python process — identify which script/server via Activity Monitor.",
+        "launchd": "System init — cannot be killed.",
     }
-    # Exact match
-    if name in known:
-        return known[name]
-    # Partial match
-    for key, advice in known.items():
+    if name in system:
+        return system[name]
+
+    # Known third-party — specific advice
+    third_party = {
+        "OneDrive": "Pause in menu bar or reduce sync scope.",
+        "Dropbox": "Pause in menu bar.",
+        "Docker Desktop": "Check resource limits: Docker Desktop → Settings → Resources.",
+        "prl_client_app": "Parallels VM — suspend or shut down the VM.",
+    }
+    for key, advice in third_party.items():
         if key.lower() in name.lower():
             return advice
-    return f'<span class="action-cmd">kill -15 $(pgrep -f "{_esc(name)}")</span>'
+
+    # Use command line to identify what the process is actually doing
+    if cmdline:
+        identity = _identify_from_cmdline(cmdline, name)
+        if identity:
+            return identity
+
+    return f'<span class="action-cmd">kill {name}: kill -15 $(pgrep -f "{_esc(name)}")</span>'
+
+
+def _identify_from_cmdline(cmdline: str, name: str) -> str:
+    """Parse a command line and return a human-readable description + action."""
+    cl = cmdline.lower()
+
+    # Python processes — identify the script/module
+    if "python" in name.lower():
+        # uvicorn / gunicorn / fastapi
+        if "uvicorn" in cl:
+            module = cmdline.split("uvicorn")[-1].strip().split()[0] if "uvicorn" in cmdline else "?"
+            return f'Web server: <code>{_esc(module)}</code> — <span class="action-cmd">kill -15 {name}</span>'
+        # python -m module
+        if " -m " in cmdline:
+            module = cmdline.split(" -m ")[-1].strip().split()[0]
+            return f'Module: <code>{_esc(module)}</code> — <span class="action-cmd">kill -15 {name}</span>'
+        # python script.py
+        for part in cmdline.split():
+            if part.endswith(".py"):
+                script = part.rsplit("/", 1)[-1]
+                return f'Script: <code>{_esc(script)}</code> — <span class="action-cmd">kill -15 {name}</span>'
+        # pip install
+        if "pip" in cl:
+            return f'pip operation — wait for it to finish.'
+
+    # Node processes
+    if "node" in name.lower():
+        if "next" in cl:
+            return 'Next.js dev server — <span class="action-cmd">kill -15 {}</span>'.format(name)
+        if "vite" in cl:
+            return 'Vite dev server — <span class="action-cmd">kill -15 {}</span>'.format(name)
+        if "tsx" in cl or "ts-node" in cl:
+            for part in cmdline.split():
+                if part.endswith(".ts") or part.endswith(".tsx"):
+                    script = part.rsplit("/", 1)[-1]
+                    return f'TypeScript: <code>{_esc(script)}</code>'
+        for part in cmdline.split():
+            if part.endswith(".js"):
+                script = part.rsplit("/", 1)[-1]
+                return f'Script: <code>{_esc(script)}</code>'
+
+    # Ruby
+    if "ruby" in name.lower():
+        if "rails" in cl:
+            return 'Rails server'
+        if "puma" in cl:
+            return 'Puma web server'
+
+    # Claude / AI tools
+    if "claude" in cl:
+        return 'Claude Code session'
+
+    # Launchd services (run-daemon.sh, run-server.sh)
+    if "run-daemon" in cl or "run-server" in cl:
+        # Extract the directory to identify the service
+        for part in cmdline.split():
+            if "/" in part and ("run-daemon" in part or "run-server" in part):
+                service = part.split("/")[-3] if part.count("/") >= 3 else part.rsplit("/", 1)[-1]
+                return f'Daemon: <code>{_esc(service)}</code> — <span class="action-cmd">launchctl list | grep {_esc(service)}</span>'
+
+    # Generic: show truncated command line so the user can at least see what it is
+    short_cmd = cmdline[:120]
+    if len(cmdline) > 120:
+        short_cmd += "..."
+    return f'<code style="font-size:11px;color:#475569">{_esc(short_cmd)}</code>'
+
+
+def _is_daemon(cmdline: str) -> bool:
+    """Detect if a process is a background daemon/service vs a user-facing app."""
+    cl = cmdline.lower()
+    daemon_signals = [
+        "launchd", "daemon", "run-server", "run-daemon", "uvicorn", "gunicorn",
+        "celery", "worker", "cron", "/usr/sbin/", "/usr/libexec/",
+        "com.apple.", "com.reeves.", "com.tosh.", "com.eidos", "com.helios",
+        "-m ", "python3 -",  # scripts run as modules
+    ]
+    app_signals = [
+        "/Applications/", ".app/Contents/MacOS/", "Electron", "iTerm",
+        "Chrome", "Safari", "Firefox", "Cursor", "Xcode",
+    ]
+    for sig in app_signals:
+        if sig.lower() in cl:
+            return False
+    for sig in daemon_signals:
+        if sig in cl:
+            return True
+    # If it's in /usr/local, /opt/homebrew, or a repos directory, likely a daemon/script
+    if any(p in cl for p in ["/repos-", "/opt/homebrew/", "/.local/", "/.venv/"]):
+        return True
+    return False
 
 
 def _esc(text: str) -> str:
@@ -601,30 +717,48 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     # ── Live Process Tables (CPU, Memory) ──
     cpu_hogs, mem_hogs = _get_live_process_tables()
 
-    if cpu_hogs:
-        max_cpu = max(float(p["cpu"]) for p in cpu_hogs) if cpu_hogs else 100
-        html += '<h2>CPU Hogs (right now)</h2>\n<div class="card">\n'
-        html += '<table><tr><th>Process</th><th style="width:220px">CPU %</th><th>MEM %</th><th>PID</th><th>Action</th></tr>\n'
-        for p in cpu_hogs:
-            action = _process_action(p["name"])
+    # Split processes into daemons vs regular
+    daemon_hogs = [p for p in cpu_hogs if _is_daemon(p.get("cmdline", ""))]
+    app_cpu_hogs = [p for p in cpu_hogs if not _is_daemon(p.get("cmdline", ""))]
+
+    if daemon_hogs:
+        max_cpu_d = max(float(p["cpu"]) for p in daemon_hogs)
+        html += '<h2>Daemon Hogs (background services)</h2>\n<div class="card">\n'
+        html += '<div style="font-size:12px;color:#64748b;margin-bottom:8px">These are launchd-managed services or background scripts running without a visible app window.</div>\n'
+        html += '<table><tr><th>Service</th><th style="width:200px">CPU %</th><th>What it is</th></tr>\n'
+        for p in daemon_hogs:
             cpu_val = float(p["cpu"])
-            bar_w = int(cpu_val / max(max_cpu, 1) * 160)
+            bar_w = int(cpu_val / max(max_cpu_d, 1) * 140)
             color = "#ef4444" if cpu_val > 50 else "#ca8a04" if cpu_val > 20 else "#0284c7"
             bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{p["cpu"]}%</span></div>'
-            html += f'<tr><td class="mono">{_esc(p["name"])}</td><td>{bar}</td><td class="mono">{p["mem"]}%</td><td class="mono">{p["pid"]}</td><td>{action}</td></tr>\n'
+            identity = _process_action(p["name"], p.get("cmdline", ""))
+            html += f'<tr><td class="mono">{_esc(p["name"])} <span style="color:#94a3b8">({p["pid"]})</span></td><td>{bar}</td><td>{identity}</td></tr>\n'
+        html += '</table></div>\n'
+
+    if app_cpu_hogs:
+        max_cpu = max(float(p["cpu"]) for p in app_cpu_hogs)
+        html += '<h2>CPU Hogs (right now)</h2>\n<div class="card">\n'
+        html += '<table><tr><th>Process</th><th style="width:200px">CPU %</th><th>MEM %</th><th>What it is</th></tr>\n'
+        for p in app_cpu_hogs:
+            cpu_val = float(p["cpu"])
+            bar_w = int(cpu_val / max(max_cpu, 1) * 140)
+            color = "#ef4444" if cpu_val > 50 else "#ca8a04" if cpu_val > 20 else "#0284c7"
+            bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{p["cpu"]}%</span></div>'
+            identity = _process_action(p["name"], p.get("cmdline", ""))
+            html += f'<tr><td class="mono">{_esc(p["name"])} <span style="color:#94a3b8">({p["pid"]})</span></td><td>{bar}</td><td class="mono">{p["mem"]}%</td><td>{identity}</td></tr>\n'
         html += '</table></div>\n'
 
     if mem_hogs:
-        max_mem = max(float(p["mem"]) for p in mem_hogs) if mem_hogs else 100
+        max_mem = max(float(p["mem"]) for p in mem_hogs)
         html += '<h2>Memory Hogs (right now)</h2>\n<div class="card">\n'
-        html += '<table><tr><th>Process</th><th style="width:220px">MEM %</th><th>CPU %</th><th>PID</th><th>Action</th></tr>\n'
+        html += '<table><tr><th>Process</th><th style="width:200px">MEM %</th><th>CPU %</th><th>What it is</th></tr>\n'
         for p in mem_hogs:
-            action = _process_action(p["name"])
             mem_val = float(p["mem"])
-            bar_w = int(mem_val / max(max_mem, 1) * 160)
+            bar_w = int(mem_val / max(max_mem, 1) * 140)
             color = "#ef4444" if mem_val > 10 else "#ca8a04" if mem_val > 5 else "#0284c7"
             bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{p["mem"]}%</span></div>'
-            html += f'<tr><td class="mono">{_esc(p["name"])}</td><td>{bar}</td><td class="mono">{p["cpu"]}%</td><td class="mono">{p["pid"]}</td><td>{action}</td></tr>\n'
+            identity = _process_action(p["name"], p.get("cmdline", ""))
+            html += f'<tr><td class="mono">{_esc(p["name"])} <span style="color:#94a3b8">({p["pid"]})</span></td><td>{bar}</td><td class="mono">{p["cpu"]}%</td><td>{identity}</td></tr>\n'
         html += '</table></div>\n'
 
     # ── Critical Issues ──
