@@ -588,7 +588,10 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
   .sysinfo {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 20px; }}
   .sysinfo-item {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 16px; text-align: center; }}
   .sysinfo-val {{ font-size: 18px; font-weight: 700; color: #0f172a; font-family: 'SF Mono', monospace; }}
+  .sysinfo-denom {{ font-size: 12px; font-weight: 400; color: #94a3b8; }}
   .sysinfo-label {{ font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }}
+  .sysinfo-bar {{ height: 4px; background: #e2e8f0; border-radius: 2px; margin-top: 6px; overflow: hidden; }}
+  .sysinfo-fill {{ height: 100%; border-radius: 2px; }}
   .card {{ background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px 20px; margin: 12px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }}
   .matrix-row {{ display: flex; align-items: center; margin: 6px 0; }}
   .matrix-label {{ width: 90px; font-size: 13px; color: #475569; }}
@@ -660,14 +663,52 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
 </div>
 """
 
-    # ── System Info strip ──
-    swap_mb = vitals.get("swap", {}).get("current_mb")
-    swap_str = f"{swap_mb / 1024:.1f} GB" if swap_mb else "?"
+    # ── System Info strip with ratios ──
+    ram_gb = info.get('memory_gb', 0)
+    swap_mb = vitals.get("swap", {}).get("current_mb") or 0
+    swap_gb = swap_mb / 1024
+    swap_pct = int(swap_gb / ram_gb * 100) if ram_gb else 0
+    swap_color = "#ef4444" if swap_pct > 50 else "#ca8a04" if swap_pct > 25 else "#22c55e"
+
+    # Get disk info
+    disk_total_gb, disk_used_gb, disk_free_gb = 0, 0, 0
+    try:
+        out = subprocess.run(["df", "-g", "/"], capture_output=True, text=True, timeout=5)
+        if out.returncode == 0:
+            parts = out.stdout.strip().split("\n")[1].split()
+            disk_total_gb = int(parts[1])
+            disk_used_gb = int(parts[2])
+            disk_free_gb = int(parts[3])
+    except (subprocess.TimeoutExpired, OSError, IndexError, ValueError):
+        pass
+    disk_pct = int(disk_used_gb / disk_total_gb * 100) if disk_total_gb else 0
+    disk_color = "#ef4444" if disk_pct > 90 else "#ca8a04" if disk_pct > 75 else "#22c55e"
+
+    # Current load ratio
+    current_load = samples[-1]["load"][0] if samples and "load" in samples[-1] else 0
+    load_pct = int(current_load / cores * 100) if cores else 0
+    load_color = "#ef4444" if load_pct > 200 else "#ca8a04" if load_pct > 100 else "#22c55e"
+
     html += f"""<div class="sysinfo">
-  <div class="sysinfo-item"><div class="sysinfo-val">{info.get('memory_gb', '?')} GB</div><div class="sysinfo-label">RAM</div></div>
-  <div class="sysinfo-item"><div class="sysinfo-val">{swap_str}</div><div class="sysinfo-label">Swap</div></div>
-  <div class="sysinfo-item"><div class="sysinfo-val">{cores}</div><div class="sysinfo-label">Cores</div></div>
-  <div class="sysinfo-item"><div class="sysinfo-val">{uptime}</div><div class="sysinfo-label">Uptime</div></div>
+  <div class="sysinfo-item">
+    <div class="sysinfo-val">{current_load:.0f} <span class="sysinfo-denom">/ {cores}</span></div>
+    <div class="sysinfo-label">Load / Cores</div>
+    <div class="sysinfo-bar"><div class="sysinfo-fill" style="width:{min(load_pct, 100)}%;background:{load_color}"></div></div>
+  </div>
+  <div class="sysinfo-item">
+    <div class="sysinfo-val">{swap_gb:.1f} <span class="sysinfo-denom">/ {ram_gb} GB</span></div>
+    <div class="sysinfo-label">Swap / RAM</div>
+    <div class="sysinfo-bar"><div class="sysinfo-fill" style="width:{min(swap_pct, 100)}%;background:{swap_color}"></div></div>
+  </div>
+  <div class="sysinfo-item">
+    <div class="sysinfo-val">{disk_used_gb} <span class="sysinfo-denom">/ {disk_total_gb} GB</span></div>
+    <div class="sysinfo-label">Disk Used</div>
+    <div class="sysinfo-bar"><div class="sysinfo-fill" style="width:{disk_pct}%;background:{disk_color}"></div></div>
+  </div>
+  <div class="sysinfo-item">
+    <div class="sysinfo-val">{uptime}</div>
+    <div class="sysinfo-label">Uptime</div>
+  </div>
 </div>
 """
 
@@ -789,25 +830,27 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     if app_cpu_hogs:
         max_cpu = max(float(p["cpu"]) for p in app_cpu_hogs)
         html += '<h2>CPU Hogs (right now)</h2>\n<div class="card">\n'
-        html += '<table><tr><th>Process</th><th style="width:200px">CPU %</th><th>MEM %</th><th>What it is</th></tr>\n'
+        html += f'<table><tr><th>Process</th><th style="width:200px">CPU (of {cores * 100}% total)</th><th>MEM (of {ram_gb} GB)</th><th>What it is</th></tr>\n'
         for p in app_cpu_hogs:
             cpu_val = float(p["cpu"])
             bar_w = int(cpu_val / max(max_cpu, 1) * 140)
             color = "#ef4444" if cpu_val > 50 else "#ca8a04" if cpu_val > 20 else "#0284c7"
             bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{p["cpu"]}%</span></div>'
             identity = _process_action(p["name"], p.get("cmdline", ""))
-            html += f'<tr><td class="mono">{_esc(p["name"])} <span style="color:#94a3b8">({p["pid"]})</span></td><td>{bar}</td><td class="mono">{p["mem"]}%</td><td>{identity}</td></tr>\n'
+            mem_gb = round(float(p["mem"]) / 100 * ram_gb, 1) if ram_gb else p["mem"]
+            html += f'<tr><td class="mono">{_esc(p["name"])} <span style="color:#94a3b8">({p["pid"]})</span></td><td>{bar}</td><td class="mono">{mem_gb} GB</td><td>{identity}</td></tr>\n'
         html += '</table></div>\n'
 
     if mem_hogs:
         max_mem = max(float(p["mem"]) for p in mem_hogs)
         html += '<h2>Memory Hogs (right now)</h2>\n<div class="card">\n'
-        html += '<table><tr><th>Process</th><th style="width:200px">MEM %</th><th>CPU %</th><th>What it is</th></tr>\n'
+        html += f'<table><tr><th>Process</th><th style="width:200px">MEM (of {ram_gb} GB)</th><th>CPU</th><th>What it is</th></tr>\n'
         for p in mem_hogs:
             mem_val = float(p["mem"])
             bar_w = int(mem_val / max(max_mem, 1) * 140)
             color = "#ef4444" if mem_val > 10 else "#ca8a04" if mem_val > 5 else "#0284c7"
-            bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{p["mem"]}%</span></div>'
+            mem_gb = round(mem_val / 100 * ram_gb, 1) if ram_gb else 0
+            bar = f'<div style="display:flex;align-items:center;gap:6px"><div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div><span class="mono">{mem_gb} GB</span></div>'
             identity = _process_action(p["name"], p.get("cmdline", ""))
             html += f'<tr><td class="mono">{_esc(p["name"])} <span style="color:#94a3b8">({p["pid"]})</span></td><td>{bar}</td><td class="mono">{p["cpu"]}%</td><td>{identity}</td></tr>\n'
         html += '</table></div>\n'
