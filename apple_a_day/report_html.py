@@ -669,7 +669,7 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
 <title>apple-a-day — {grade} ({overall}/100)</title>
 <style>
   * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-  body {{ background: #faf9f6; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 24px; max-width: 860px; margin: 0 auto; font-size: 14px; line-height: 1.5; }}
+  body {{ background: #faf9f6; color: #1e293b; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 0; margin: 0; font-size: 14px; line-height: 1.5; }}
   code, .mono {{ font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; }}
   h1 {{ font-size: 20px; font-weight: 700; margin-bottom: 4px; }}
   h2 {{ font-size: 15px; font-weight: 600; color: #475569; margin: 28px 0 12px; border-bottom: 1px solid #e7e5e0; padding-bottom: 6px; }}
@@ -743,14 +743,20 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
   .level-pill .pill-desc {{ font-size: 11px; font-weight: 400; display: block; margin-top: 1px; }}
   .l2 {{ display: none; }}
   .l3 {{ display: none; }}
-  .layout {{ display: flex; gap: 24px; }}
-  .main {{ flex: 1; min-width: 0; }}
-  .sidebar {{ width: 160px; flex-shrink: 0; position: sticky; top: 16px; align-self: flex-start; }}
-  .sidebar nav {{ background: #fff; border: 1px solid #e7e5e0; border-radius: 8px; padding: 12px; font-size: 12px; }}
-  .sidebar nav a {{ display: block; padding: 4px 8px; color: #64748b; text-decoration: none; border-radius: 4px; margin: 1px 0; }}
+  body {{ display: flex; }}
+  .sidebar {{ position: fixed; left: 0; top: 0; width: 180px; height: 100vh; background: #fff; border-right: 1px solid #e7e5e0; padding: 20px 12px; overflow-y: auto; z-index: 10; }}
+  .sidebar .logo {{ font-size: 20px; font-weight: 700; color: #1a3a1a; margin-bottom: 16px; padding: 0 8px; }}
+  .sidebar nav {{ font-size: 12px; }}
+  .sidebar nav a {{ display: block; padding: 5px 10px; color: #64748b; text-decoration: none; border-radius: 4px; margin: 1px 0; transition: all 0.1s; }}
   .sidebar nav a:hover {{ background: #f0f7f0; color: #1a3a1a; }}
-  .sidebar nav .nav-label {{ font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; padding: 8px 8px 2px; }}
-  @media (max-width: 900px) {{ .sidebar {{ display: none; }} }}
+  .sidebar nav a.active {{ background: #1a3a1a; color: #fff; }}
+  .sidebar nav .nav-label {{ font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; padding: 10px 10px 3px; }}
+  .main {{ margin-left: 180px; flex: 1; min-width: 0; max-width: 860px; padding: 24px; }}
+  .layout {{ display: block; }}
+  .apple-progress {{ position: fixed; left: 0; bottom: 0; width: 180px; height: 48px; background: #fff; border-top: 1px solid #e7e5e0; border-right: 1px solid #e7e5e0; display: flex; align-items: center; padding: 0 16px; z-index: 11; }}
+  .apple-track {{ flex: 1; height: 4px; background: #e7e5e0; border-radius: 2px; position: relative; }}
+  .apple-dot {{ position: absolute; top: -10px; font-size: 20px; transition: left 0.15s; }}
+  @media (max-width: 900px) {{ .sidebar {{ display: none; }} .main {{ margin-left: 0; }} .apple-progress {{ display: none; }} }}
   footer {{ margin-top: 32px; padding-top: 16px; border-top: 1px solid #e7e5e0; font-size: 11px; color: #94a3b8; text-align: center; }}
   footer::before {{ content: "🍏 "; }}
 </style>
@@ -840,25 +846,48 @@ function setLevel(n) {
 </script>
 """
 
-    # ── Sidebar nav ──
-    html += """<div class="layout">
-<div class="sidebar"><nav>
-  <div class="nav-label">Overview</div>
-  <a href="#bluf">BLUF</a>
-  <a href="#sysinfo">System</a>
-  <a href="#actions">Actions</a>
-  <div class="nav-label">Level 2</div>
-  <a href="#matrix">Health Matrix</a>
-  <a href="#pressure">Pressure</a>
-  <a href="#criticals">Critical Issues</a>
-  <div class="nav-label">Level 3</div>
-  <a href="#load">Load History</a>
-  <a href="#hogs">Process Hogs</a>
-  <a href="#warnings">Warnings</a>
-  <a href="#cleanup">App Cleanup</a>
-  <a href="#redundant">Redundant Apps</a>
-</nav></div>
+    # ── Fixed sidebar + apple progress ──
+    html += """<div class="sidebar">
+  <div class="logo">🍎 aad</div>
+  <nav>
+    <div class="nav-label">Overview</div>
+    <a href="#bluf">BLUF</a>
+    <a href="#sysinfo">System</a>
+    <a href="#actions">Actions</a>
+    <div class="nav-label">Analysis</div>
+    <a href="#matrix">Health Matrix</a>
+    <a href="#pressure">Pressure</a>
+    <a href="#criticals">Critical Issues</a>
+    <div class="nav-label">Deep Dive</div>
+    <a href="#load">Load History</a>
+    <a href="#hogs">Process Hogs</a>
+    <a href="#warnings">Warnings</a>
+    <a href="#cleanup">App Cleanup</a>
+    <a href="#redundant">Redundant Apps</a>
+  </nav>
+  <div class="apple-progress">
+    <div class="apple-track"><span class="apple-dot" id="appleDot">🍎</span></div>
+  </div>
+</div>
 <div class="main">
+<script>
+// Apple scroll progress
+const dot = document.getElementById('appleDot');
+const navLinks = document.querySelectorAll('.sidebar nav a');
+window.addEventListener('scroll', () => {
+  const pct = window.scrollY / (document.body.scrollHeight - window.innerHeight) * 100;
+  if (dot) dot.style.left = Math.min(pct, 95) + '%';
+  // Highlight active nav link
+  let active = null;
+  navLinks.forEach(a => {
+    const id = a.getAttribute('href')?.slice(1);
+    const el = id && document.getElementById(id);
+    if (el && el.getBoundingClientRect().top <= 80) active = a;
+  });
+  navLinks.forEach(a => a.classList.remove('active'));
+  if (active) active.classList.add('active');
+});
+</script>
 """
 
     # ── Action Plan (rendered later, after stale_apps/redundant are available) ──
@@ -1168,7 +1197,7 @@ function setLevel(n) {
 
     html += '</div><!-- /l3 -->\n</div><!-- /l2 -->\n'
 
-    html += '</div><!-- /main --></div><!-- /layout -->\n'
+    html += '</div><!-- /main -->\n'
     html += f"""
 <footer>apple-a-day v0.2.0 · {now_str} · {report.duration_ms}ms</footer>
 </body></html>"""
