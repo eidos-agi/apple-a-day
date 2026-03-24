@@ -160,6 +160,22 @@ enum DaemonStatus {
     }
 }
 
+// MARK: - Report Entry
+
+struct ReportEntry: Identifiable {
+    let id: String
+    let filename: String
+    let path: String
+    let timestamp: String
+
+    init(filename: String, path: String, timestamp: String) {
+        self.id = filename
+        self.filename = filename
+        self.path = path
+        self.timestamp = timestamp
+    }
+}
+
 // MARK: - App State
 
 enum AppState {

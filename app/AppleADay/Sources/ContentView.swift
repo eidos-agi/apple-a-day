@@ -2,6 +2,9 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var healthService: HealthService
+    @State private var activePanel: ActivePanel = .health
+
+    private enum ActivePanel { case health, reports }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -13,31 +16,60 @@ struct ContentView: View {
                 Text("Apple a Day")
                     .font(.headline)
                 Spacer()
+                if case .ready = healthService.appState {
+                    HStack(spacing: 4) {
+                        headerTab("Health", panel: .health)
+                        headerTab("Reports", panel: .reports)
+                    }
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
             Divider()
 
-            // Content based on app state
-            switch healthService.appState {
-            case .loading:
-                LoadingView()
-            case .cliNotFound:
-                CliNotFoundView()
-            case .noData:
-                NoDataView(onRunCheckup: { healthService.runCheckup() })
-            case .ready:
-                HealthPanelView()
+            // Content
+            switch activePanel {
+            case .health:
+                healthContent
+            case .reports:
+                ReportsView(onDismiss: { activePanel = .health })
                     .environmentObject(healthService)
-            case .error(let message):
-                ErrorView(message: message, onRetry: { healthService.loadData() })
             }
         }
         .frame(width: 320)
         .onAppear {
             healthService.bootstrap()
         }
+    }
+
+    @ViewBuilder
+    private var healthContent: some View {
+        switch healthService.appState {
+        case .loading:
+            LoadingView()
+        case .cliNotFound:
+            CliNotFoundView()
+        case .noData:
+            NoDataView(onRunCheckup: { healthService.runCheckup() })
+        case .ready:
+            HealthPanelView()
+                .environmentObject(healthService)
+        case .error(let message):
+            ErrorView(message: message, onRetry: { healthService.loadData() })
+        }
+    }
+
+    private func headerTab(_ label: String, panel: ActivePanel) -> some View {
+        Button(action: { activePanel = panel }) {
+            Text(label)
+                .font(.caption)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+        }
+        .buttonStyle(.plain)
+        .background(activePanel == panel ? Color.accentColor.opacity(0.15) : Color.clear)
+        .cornerRadius(4)
     }
 }
 
@@ -450,10 +482,6 @@ private struct QuickActionsView: View {
             }
             .disabled(healthService.isRunningCheckup)
 
-            Button(action: { healthService.openReport() }) {
-                Label("Report", systemImage: "doc.text")
-            }
-
             Button(action: { NSApplication.shared.terminate(nil) }) {
                 Label("Quit", systemImage: "power")
             }
@@ -461,5 +489,98 @@ private struct QuickActionsView: View {
         .buttonStyle(.bordered)
         .controlSize(.small)
         .font(.caption)
+    }
+}
+
+// MARK: - Reports View
+
+struct ReportsView: View {
+    @EnvironmentObject var healthService: HealthService
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            // Generate button
+            Button(action: { healthService.generateReport() }) {
+                if healthService.isGeneratingReport {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Generating report...")
+                            .font(.caption)
+                    }
+                } else {
+                    Label("Generate New Report", systemImage: "doc.badge.plus")
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .disabled(healthService.isGeneratingReport)
+
+            // Past reports list
+            if healthService.pastReports.isEmpty && !healthService.isGeneratingReport {
+                VStack(spacing: 8) {
+                    Image(systemName: "doc.text.magnifyingglass")
+                        .font(.title2)
+                        .foregroundColor(.secondary)
+                    Text("No reports yet")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Text("Generate your first report to see it here.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 12)
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Past Reports")
+                        .font(.caption.bold())
+                        .foregroundColor(.secondary)
+                    ForEach(healthService.pastReports) { report in
+                        ReportRow(report: report, onOpen: {
+                            healthService.openReportFile(report)
+                        })
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .onAppear {
+            healthService.loadPastReports()
+        }
+    }
+}
+
+private struct ReportRow: View {
+    let report: ReportEntry
+    let onOpen: () -> Void
+
+    var body: some View {
+        Button(action: onOpen) {
+            HStack {
+                Image(systemName: "doc.richtext")
+                    .foregroundColor(.accentColor)
+                    .font(.caption)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(report.timestamp)
+                        .font(.caption)
+                    Text(report.filename)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Image(systemName: "arrow.up.right.square")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .background(Color.gray.opacity(0.05))
+        .cornerRadius(4)
     }
 }

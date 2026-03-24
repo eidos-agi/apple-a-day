@@ -11,6 +11,8 @@ class HealthService: ObservableObject {
     @Published var checkupDaemon: DaemonStatus = .unknown
     @Published var vitalsDaemon: DaemonStatus = .unknown
     @Published var isRunningCheckup = false
+    @Published var isGeneratingReport = false
+    @Published var pastReports: [ReportEntry] = []
     @Published var cliPath: String?
 
     private let logDir: String = {
@@ -67,6 +69,7 @@ class HealthService: ObservableObject {
         loadRecentVitals()
         loadScore()
         checkDaemons()
+        loadPastReports()
 
         if lastCheckup == nil && recentVitals.isEmpty {
             appState = .noData
@@ -161,15 +164,53 @@ class HealthService: ObservableObject {
         }
     }
 
-    func openReport() {
+    func generateReport() {
         guard let path = cliPath else { return }
-        Self.log("Opening HTML report...")
+        isGeneratingReport = true
+        Self.log("Generating HTML report...")
         Task {
             let result = shell(path, "report", "--html")
-            if result.status != 0 {
+            isGeneratingReport = false
+            if result.status == 0 {
+                Self.log("Report generated")
+                loadPastReports()
+            } else {
                 Self.log("Report failed: \(result.output)")
             }
         }
+    }
+
+    func openReportFile(_ report: ReportEntry) {
+        NSWorkspace.shared.open(URL(fileURLWithPath: report.path))
+    }
+
+    func loadPastReports() {
+        let reportsDir = "\(logDir)/reports"
+        guard let contents = try? FileManager.default.contentsOfDirectory(atPath: reportsDir) else {
+            pastReports = []
+            return
+        }
+        pastReports = contents
+            .filter { $0.hasPrefix("report-") && $0.hasSuffix(".html") && $0 != "report-latest.html" }
+            .sorted(by: >)
+            .prefix(10)
+            .map { filename in
+                // report-2026-03-24T10-30-00.html → 2026-03-24 10:30:00
+                let raw = filename
+                    .replacingOccurrences(of: "report-", with: "")
+                    .replacingOccurrences(of: ".html", with: "")
+                let parts = raw.split(separator: "T", maxSplits: 1)
+                let date = String(parts.first ?? "")
+                let time = parts.count > 1
+                    ? String(parts[1]).replacingOccurrences(of: "-", with: ":")
+                    : ""
+                return ReportEntry(
+                    filename: filename,
+                    path: "\(reportsDir)/\(filename)",
+                    timestamp: "\(date) \(time)"
+                )
+            }
+        Self.log("Found \(pastReports.count) past reports")
     }
 
     // MARK: - Shell Helper

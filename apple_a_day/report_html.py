@@ -589,7 +589,32 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     stale_apps = _find_stale_apps()
     remove_candidates = [a for a in stale_apps if a.get("days_ago", 0) > 90]
 
-    # Redundancy
+    # Similar apps (ensemble ranking)
+    from .ensemble_similarity import ensemble_score as _ensemble_score
+    from .app_similarity import get_app_metadata as _get_meta
+    _sim_apps = {}
+    for app_path in _glob.glob("/Applications/*.app"):
+        name = os.path.basename(app_path).replace(".app", "")
+        if name in _SAFE_APPS:
+            continue
+        try:
+            _sim_apps[name] = _get_meta(app_path)
+        except Exception:
+            pass
+    similar_pairs = []
+    _sim_names = list(_sim_apps.keys())
+    for i, name_a in enumerate(_sim_names):
+        for name_b in _sim_names[i + 1:]:
+            score, reasons = _ensemble_score(_sim_apps[name_a], _sim_apps[name_b])
+            if score > 0.3 and reasons:
+                similar_pairs.append({
+                    "app_a": name_a, "app_b": name_b,
+                    "score": score, "reasons": ". ".join(reasons),
+                })
+    similar_pairs.sort(key=lambda x: x["score"], reverse=True)
+    similar_pairs = similar_pairs[:10]
+
+    # Legacy: keep redundant for action plan compatibility
     all_apps_for_sim = []
     for app_path in _glob.glob("/Applications/*.app"):
         name = os.path.basename(app_path).replace(".app", "")
@@ -661,7 +686,8 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
         stale_apps=stale_apps, remove_candidates=remove_candidates,
         scatterplot_svg=_cleanup_scatterplot(stale_apps),
         max_remove_size=max(a.get("size_mb", 1) for a in remove_candidates) if remove_candidates else 1,
-        # Redundancy
+        # Similarity
+        similar_pairs=similar_pairs,
         redundant=redundant,
         # Actions
         immediate=action_plan["immediate"], longterm=action_plan["longterm"],
@@ -691,9 +717,14 @@ def _build_report_json(grade, overall, matrix, criticals, warnings, infos,
 
 def open_report(vitals_minutes: int = 60) -> Path:
     html = generate_html_report(vitals_minutes=vitals_minutes)
-    report_dir = Path.home() / ".config" / "eidos" / "aad-logs"
+    report_dir = Path.home() / ".config" / "eidos" / "aad-logs" / "reports"
     report_dir.mkdir(parents=True, exist_ok=True)
-    report_path = report_dir / "report.html"
+    # Timestamped copy for history
+    ts = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    report_path = report_dir / f"report-{ts}.html"
     report_path.write_text(html)
+    # Also write latest for quick access
+    latest = report_dir / "report-latest.html"
+    latest.write_text(html)
     webbrowser.open(f"file://{report_path}")
     return report_path

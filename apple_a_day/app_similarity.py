@@ -1,10 +1,19 @@
-"""Score functional similarity between Mac apps using plist metadata.
+"""Score functional similarity between Mac apps.
+
+Uses ML model (logistic regression) when sklearn is installed,
+falls back to weighted heuristics otherwise. Both paths share
+the same feature extraction from app bundles.
 
 Signals:
-  1. LSApplicationCategoryType — Apple's app category enum
-  2. CFBundleDocumentTypes — what file types the app opens (UTIs)
-  3. CFBundleName / CFBundleGetInfoString — name and description text
-  4. Known synonym groups — hardcoded for common app pairs
+  1. Runtime detection — Electron/native/Java/Python/Qt
+  2. Framework fingerprint — shared linked frameworks
+  3. LSApplicationCategoryType — Apple's app category enum
+  4. CFBundleDocumentTypes — what file types the app opens (UTIs)
+  5. URL schemes — registered protocol handlers
+  6. Bundle ID prefix — vendor identification
+  7. Binary size ratio — similar-sized apps of same type
+  8. Known synonym groups — hardcoded for common app pairs
+  9. CFBundleName / CFBundleGetInfoString — name and description text
 
 The output is a similarity score 0-1 where:
   0.8+ = strong functional overlap (same purpose)
@@ -37,7 +46,7 @@ def get_app_metadata(app_path: str) -> dict:
     name = info.get("CFBundleName", info.get("CFBundleDisplayName",
            os.path.basename(app_path).replace(".app", "")))
 
-    return {
+    base = {
         "name": name,
         "bundle_id": info.get("CFBundleIdentifier", ""),
         "category": info.get("LSApplicationCategoryType", ""),
@@ -45,30 +54,52 @@ def get_app_metadata(app_path: str) -> dict:
         "utis": utis,
     }
 
+    # Enrich with deeper signals from feature_extraction
+    from .feature_extraction import extract_features
+    base.update(extract_features(app_path))
+    return base
+
 
 def similarity_score(app_a: dict, app_b: dict) -> float:
-    """Compute functional similarity between two apps. Returns 0-1."""
+    """Compute functional similarity between two apps. Returns 0-1.
+
+    Weighted heuristic with synonym groups, category, UTIs, runtime,
+    URL schemes, and text similarity.
+    """
     scores = []
 
-    # 1. Known synonym groups (weight: 0.5 of final)
+    # 1. Known synonym groups (weight: 0.45)
     synonym = _known_synonym_score(app_a["name"], app_b["name"])
     if synonym > 0:
-        scores.append(("synonym", synonym, 0.5))
+        scores.append(("synonym", synonym, 0.45))
 
-    # 2. Category match (weight: 0.25)
+    # 2. Category match (weight: 0.2)
     cat_score = _category_score(app_a.get("category", ""), app_b.get("category", ""))
     if cat_score > 0:
-        scores.append(("category", cat_score, 0.25))
+        scores.append(("category", cat_score, 0.2))
 
-    # 3. UTI overlap (weight: 0.15)
+    # 3. UTI overlap (weight: 0.1)
     uti_score = _uti_overlap(app_a.get("utis", set()), app_b.get("utis", set()))
     if uti_score > 0:
-        scores.append(("uti", uti_score, 0.15))
+        scores.append(("uti", uti_score, 0.1))
 
-    # 4. Name/description similarity (weight: 0.1)
+    # 4. Runtime match (weight: 0.15) — NEW
+    rt_a = app_a.get("runtime", "unknown")
+    rt_b = app_b.get("runtime", "unknown")
+    if rt_a == rt_b and rt_a not in ("unknown", "native"):
+        scores.append(("runtime", 1.0, 0.15))
+
+    # 5. Name/description similarity (weight: 0.05)
     text_score = _text_similarity(app_a, app_b)
     if text_score > 0:
-        scores.append(("text", text_score, 0.1))
+        scores.append(("text", text_score, 0.05))
+
+    # 6. URL scheme overlap (weight: 0.05) — NEW
+    urls_a = app_a.get("url_schemes", set())
+    urls_b = app_b.get("url_schemes", set())
+    generic = {"http", "https", "file", "mailto"}
+    if (urls_a - generic) & (urls_b - generic):
+        scores.append(("url_schemes", 1.0, 0.05))
 
     if not scores:
         return 0.0
@@ -284,5 +315,23 @@ def _explain_similarity(meta_a: dict, meta_b: dict) -> str:
         types = sorted(list(overlap))[:3]
         short = [t.split(".")[-1] for t in types]
         reasons.append(f"shared file types: {', '.join(short)}")
+
+    # New signals
+    rt_a = meta_a.get("runtime", "unknown")
+    rt_b = meta_b.get("runtime", "unknown")
+    if rt_a == rt_b and rt_a not in ("unknown", "native"):
+        reasons.append(f"both are {rt_a} apps")
+
+    vendor_a = meta_a.get("vendor", "")
+    vendor_b = meta_b.get("vendor", "")
+    if vendor_a and vendor_b and vendor_a == vendor_b and vendor_a != "com.apple":
+        reasons.append(f"same developer ({vendor_a})")
+
+    urls_a = meta_a.get("url_schemes", set())
+    urls_b = meta_b.get("url_schemes", set())
+    url_generic = {"http", "https", "file", "mailto"}
+    shared_schemes = (urls_a & urls_b) - url_generic
+    if shared_schemes:
+        reasons.append(f"shared URL schemes: {', '.join(sorted(shared_schemes)[:3])}")
 
     return ". ".join(reasons) if reasons else "similar functionality"

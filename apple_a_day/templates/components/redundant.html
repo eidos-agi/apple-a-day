@@ -1,5 +1,26 @@
+{% if similar_pairs %}
+<h2>Apps That May Serve Similar Purposes</h2>
+<div class="card">
+  <div style="font-size:12px;color:#475569;margin-bottom:8px">Ranked by signal strength. Review and decide — this is informational, not a recommendation.</div>
+  <table>
+    <tr><th>App</th><th></th><th>App</th><th>Score</th><th>Why</th></tr>
+    {% for p in similar_pairs %}
+    {% set score_pct = (p.score * 100)|int %}
+    {% set color = '#16a34a' if score_pct >= 70 else '#ca8a04' if score_pct >= 50 else '#94a3b8' %}
+    <tr>
+      <td><b>{{ p.app_a }}</b></td>
+      <td style="color:#94a3b8">↔</td>
+      <td><b>{{ p.app_b }}</b></td>
+      <td style="color:{{ color }};font-weight:600">{{ score_pct }}%</td>
+      <td style="font-size:12px">{{ p.reasons }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endif %}
+
 {% if redundant %}
-<h2>Safe to Remove (you already have an alternative)</h2>
+<h2>Unused Apps With Active Alternatives</h2>
 <div class="card">
   <div style="font-size:12px;color:#475569;margin-bottom:8px">These unused apps have an actively-used equivalent on your Mac.</div>
   <table>
