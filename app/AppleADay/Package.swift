@@ -8,7 +8,7 @@ let package = Package(
         .executableTarget(
             name: "AppleADay",
             path: "Sources",
-            exclude: ["Info.plist"]
+            exclude: ["Info.plist", "AppIcon.icns"]
         ),
     ]
 )
