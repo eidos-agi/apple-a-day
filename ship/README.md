@@ -24,18 +24,20 @@
 ## Preflight
 
 ### Steps
-1. `pytest tests/ -x -q` — run all tests, stop on first failure
-2. Secrets scan: grep staged files for `api_key|secret|password|token|credential` patterns. HARD FAIL if found.
-3. Version check: ensure `__init__.py` version matches `pyproject.toml` version
-4. Template check: `ls apple_a_day/templates/components/ | wc -l` — should be 14+ component files
-5. Report: pass/fail
+1. `ruff check .` — lint must pass. This is what CI runs. HARD FAIL if errors.
+2. `pytest tests/ -x -q` — run all tests, stop on first failure
+3. Secrets scan: grep staged files for `api_key|secret|password|token|credential` patterns. HARD FAIL if found.
+4. Untracked artifact scan: check for `.build/`, `node_modules/`, `*.o`, `*.egg-info/`, large binaries in untracked files. WARN before committing — these should be in .gitignore.
+5. Version check: ensure `__init__.py` version matches `pyproject.toml` version
+6. Template check: `ls apple_a_day/templates/components/ | wc -l` — should be 14+ component files
+7. Report: pass/fail
 
 ## Commit
 
 ### Steps
 1. Run **Status**
 2. Run **Preflight** — stop if any hard failures
-3. Stage files: `git add` specific files (never `git add .`)
+3. Stage files: `git add` specific files only. NEVER use `git add -A` or `git add .` — review every file being staged. Check `git status` for untracked directories that shouldn't be committed.
 4. Commit message style: match existing (`feat:`, `fix:`, `refactor:`)
 5. Footer: `Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>`
 6. Show `git log --oneline -N` after committing
