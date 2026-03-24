@@ -258,7 +258,7 @@ def analyze_vitals(minutes: int = 60) -> dict:
     # Load analysis
     loads_1m = [(s["ts"], s["load"][0]) for s in samples if "load" in s]
     peak_entry = max(loads_1m, key=lambda x: x[1]) if loads_1m else (None, 0)
-    avg_1m = sum(l[1] for l in loads_1m) / len(loads_1m) if loads_1m else 0
+    avg_1m = sum(entry[1] for entry in loads_1m) / len(loads_1m) if loads_1m else 0
 
     # Spike detection: load > 3x cores
     spike_threshold = cores * 3

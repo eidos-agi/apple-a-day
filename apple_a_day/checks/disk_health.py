@@ -66,8 +66,8 @@ def check_disk_health() -> CheckResult:
 
             details = ""
             if sev != Severity.OK and ctx.get("is_developer"):
-                details = (f"Developers with heavy workloads should keep 50+ GB free "
-                           f"to avoid swap pressure and slow builds.")
+                details = ("Developers with heavy workloads should keep 50+ GB free "
+                           "to avoid swap pressure and slow builds.")
 
             result.findings.append(Finding(
                 check="disk_health",
@@ -90,7 +90,7 @@ def check_disk_health() -> CheckResult:
         for container in containers:
             ref = container.get("ContainerReference", "unknown")
             volumes = container.get("Volumes", [])
-            roles = [v.get("Roles", []) for v in volumes]
+            [v.get("Roles", []) for v in volumes]
             result.findings.append(Finding(
                 check="disk_health",
                 severity=Severity.OK,
@@ -105,7 +105,7 @@ def check_disk_health() -> CheckResult:
             ["tmutil", "listlocalsnapshots", "/"],
             capture_output=True, text=True, timeout=10,
         )
-        snapshots = [l for l in out.stdout.strip().split("\n") if l.startswith("com.apple")]
+        snapshots = [line for line in out.stdout.strip().split("\n") if line.startswith("com.apple")]
         count = len(snapshots)
         if count > 20:
             sev = Severity.WARNING

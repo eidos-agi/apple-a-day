@@ -221,7 +221,7 @@ def _render_ansi(overall, grade, matrix, criticals, warnings, _infos,
 
     lines.append("")
     lines.append(_c("╔" + "═" * (w - 2) + "╗", DIM))
-    title = f"  apple-a-day health report"
+    title = "  apple-a-day health report"
     grade_str = f"{grade} ({overall}/100)"
     pad = w - 4 - len(title) - len(grade_str)
     lines.append(_c("║", DIM) + _c(title, BOLD) + " " * pad + _c(grade_str, grade_color, BOLD) + _c("  ║", DIM))

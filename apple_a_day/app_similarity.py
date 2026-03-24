@@ -14,7 +14,6 @@ The output is a similarity score 0-1 where:
 
 import os
 import plistlib
-from pathlib import Path
 
 
 def get_app_metadata(app_path: str) -> dict:

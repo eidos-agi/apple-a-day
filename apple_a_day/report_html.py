@@ -369,9 +369,12 @@ def _compute_matrix(report) -> dict:
         score = 100
         for f in r.findings:
             s = f.severity.value
-            if s == "critical": score = min(score, 0)
-            elif s == "warning": score = min(score, 50)
-            elif s == "info": score = min(score, 80)
+            if s == "critical":
+                score = min(score, 0)
+            elif s == "warning":
+                score = min(score, 50)
+            elif s == "info":
+                score = min(score, 80)
         check_scores[r.name] = score
     matrix = {}
     for dim, checks in dim_checks.items():
@@ -485,9 +488,12 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     for r in report.results:
         for f in r.findings:
             entry = {"check": r.name, "summary": f.summary, "fix": f.fix, "details": f.details, "severity": f.severity.value}
-            if f.severity.value == "critical": criticals.append(entry)
-            elif f.severity.value == "warning": warnings.append(entry)
-            elif f.severity.value == "info": infos.append(entry)
+            if f.severity.value == "critical":
+                criticals.append(entry)
+            elif f.severity.value == "warning":
+                warnings.append(entry)
+            elif f.severity.value == "info":
+                infos.append(entry)
 
     # Matrix
     matrix = _compute_matrix(report)

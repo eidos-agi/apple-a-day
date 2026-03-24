@@ -1,0 +1,15 @@
+{
+  "id": "08f574be-45d8-47bc-8661-5511aaa6e1fe",
+  "version": "0.1.0",
+  "projectName": "menu-bar-app",
+  "created": "2026-03-24",
+  "phase": "research",
+  "transitions": [
+    {
+      "phase": "research",
+      "date": "2026-03-24"
+    }
+  ],
+  "question": "What should a macOS menu bar app for apple-a-day include? What's the right icon, what actions should it surface, what health data should be visible at a glance, and what patterns do best-in-class menu bar health/monitoring apps follow?",
+  "context": "apple-a-day is an agent-native Mac health diagnostic tool with a CLI (aad) that runs 13 checks (crash loops, kernel panics, thermal, memory pressure, disk health, security, network, etc.) and produces structured JSON. It has two launchd daemons: a daily checkup at 9am and a vitals monitor sampling every 60s. The user's principle: \"anything that is a daemon should have a menu bar icon so people understand it's running.\" The icon concept is apple + stethoscope. The app should follow the ManyHats pattern: SwiftUI MenuBarExtra(.window), inline view swapping (no .sheet()), LSUIElement=true, compact icon. But we need to research what data and actions make sense for a health monitoring menu bar app specifically."
+}

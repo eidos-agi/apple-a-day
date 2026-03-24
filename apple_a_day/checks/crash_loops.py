@@ -1,8 +1,7 @@
 """Detect services crash-looping via DiagnosticReports."""
 
-import os
 from collections import Counter
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 
 from ..models import CheckResult, Finding, Severity
@@ -45,7 +44,7 @@ def check_crash_loops(hours: int = 24) -> CheckResult:
             check="crash_loops",
             severity=severity,
             summary=f"{process} crashed {count} times in the last {hours}h",
-            details=f"Crash reports found in DiagnosticReports directories.",
+            details="Crash reports found in DiagnosticReports directories.",
             fix=f"Check: `log show --predicate 'process == \"{process}\"' --last {hours}h`"
                 f" or reinstall the service.",
         ))

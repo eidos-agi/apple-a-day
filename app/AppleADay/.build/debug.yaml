@@ -1,0 +1,81 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "AppleADay-arm64-apple-macosx15.0-debug.exe": ["<AppleADay-arm64-apple-macosx15.0-debug.exe>"]
+  "AppleADay-arm64-apple-macosx15.0-debug.module": ["<AppleADay-arm64-apple-macosx15.0-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<AppleADay-arm64-apple-macosx15.0-debug.exe>","<AppleADay-arm64-apple-macosx15.0-debug.module>"]
+  "test": ["<AppleADay-arm64-apple-macosx15.0-debug.exe>","<AppleADay-arm64-apple-macosx15.0-debug.module>"]
+default: "main"
+nodes:
+  "/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/Sources/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+  "/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay":
+    is-mutated: true
+commands:
+  "/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay-entitlement.plist":
+    tool: write-auxiliary-file
+    inputs: ["<entitlement-plist>","<com.apple.security.get-task-allow>"]
+    outputs: ["/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay-entitlement.plist"]
+    description: "Write auxiliary file /Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay-entitlement.plist"
+
+  "/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/Sources/AppleADayApp.swift","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/Sources/ContentView.swift","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/Sources/HealthService.swift","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/Sources/Models.swift"]
+    outputs: ["/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/sources"]
+    description: "Write auxiliary file /Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/sources"
+
+  "/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.product/Objects.LinkFileList":
+    tool: write-auxiliary-file
+    inputs: ["<link-file-list>","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/AppleADayApp.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/ContentView.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/HealthService.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/Models.swift.o"]
+    outputs: ["/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.product/Objects.LinkFileList"]
+    description: "Write auxiliary file /Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.product/Objects.LinkFileList"
+
+  "/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"]
+    outputs: ["/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+
+  "<AppleADay-arm64-apple-macosx15.0-debug.exe>":
+    tool: phony
+    inputs: ["<AppleADay-arm64-apple-macosx15.0-debug.exe-CodeSigning>"]
+    outputs: ["<AppleADay-arm64-apple-macosx15.0-debug.exe>"]
+
+  "<AppleADay-arm64-apple-macosx15.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/AppleADayApp.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/ContentView.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/HealthService.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/Models.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/Modules/AppleADay.swiftmodule"]
+    outputs: ["<AppleADay-arm64-apple-macosx15.0-debug.module>"]
+
+  "C.AppleADay-arm64-apple-macosx15.0-debug.exe":
+    tool: shell
+    inputs: ["/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/AppleADayApp.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/ContentView.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/HealthService.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/Models.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.product/Objects.LinkFileList"]
+    outputs: ["/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay"]
+    description: "Linking ./.build/arm64-apple-macosx/debug/AppleADay"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-L","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug","-o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay","-module-name","AppleADay","-Xlinker","-no_warn_duplicate_libraries","-emit-executable","-Xlinker","-alias","-Xlinker","_AppleADay_main","-Xlinker","_main","-Xlinker","-rpath","-Xlinker","@loader_path","@/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.product/Objects.LinkFileList","-target","arm64-apple-macosx13.0","-Xlinker","-add_ast_path","-Xlinker","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/Modules/AppleADay.swiftmodule","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.2.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g"]
+
+  "C.AppleADay-arm64-apple-macosx15.0-debug.exe-entitlements":
+    tool: shell
+    inputs: ["/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay-entitlement.plist"]
+    outputs: ["<AppleADay-arm64-apple-macosx15.0-debug.exe-CodeSigning>"]
+    description: "Applying debug entitlements to ./.build/arm64-apple-macosx/debug/AppleADay"
+    args: ["codesign","--force","--sign","-","--entitlements","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay-entitlement.plist","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay"]
+
+  "C.AppleADay-arm64-apple-macosx15.0-debug.module":
+    tool: shell
+    inputs: ["/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/Sources/AppleADayApp.swift","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/Sources/ContentView.swift","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/Sources/HealthService.swift","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/Sources/Models.swift","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/sources"]
+    outputs: ["/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/AppleADayApp.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/ContentView.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/HealthService.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/Models.swift.o","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/Modules/AppleADay.swiftmodule"]
+    description: "Compiling Swift Module 'AppleADay' (4 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","AppleADay","-emit-dependencies","-emit-module","-emit-module-path","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/Modules/AppleADay.swiftmodule","-output-file-map","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/output-file-map.json","-incremental","-c","@/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/AppleADay.build/sources","-I","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx13.0","-enable-batch-mode","-index-store-path","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j14","-DSWIFT_PACKAGE","-DDEBUG","-module-cache-path","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-Xfrontend","-entry-point-function-name","-Xfrontend","AppleADay_main","-swift-version","5","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.2.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.2.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","appleaday"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/Sources/","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/Package.swift","/Users/dshanklinbv/repos-eidos-agi/apple-a-day/app/AppleADay/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

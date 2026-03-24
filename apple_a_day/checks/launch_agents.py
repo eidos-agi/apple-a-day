@@ -67,7 +67,7 @@ def check_launch_agents() -> CheckResult:
     crashed_labels = {label for label, _ in crashed_services}
     for label, plist_file in keepalive_services:
         if label in crashed_labels:
-            status = next(s for l, s in crashed_services if l == label)
+            status = next(s for lbl, s in crashed_services if lbl == label)
             result.findings.append(Finding(
                 check="launch_agents",
                 severity=Severity.CRITICAL,
@@ -90,7 +90,7 @@ def check_launch_agents() -> CheckResult:
         result.findings.insert(0, Finding(
             check="launch_agents",
             severity=Severity.OK,
-            summary=f"No crash-looping launch agents detected",
+            summary="No crash-looping launch agents detected",
         ))
 
     return result

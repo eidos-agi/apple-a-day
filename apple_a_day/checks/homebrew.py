@@ -27,7 +27,7 @@ def check_homebrew() -> CheckResult:
             capture_output=True, text=True, timeout=60,
         )
         if out.returncode != 0:
-            warnings = [l for l in out.stderr.split("\n") if l.startswith("Warning:")]
+            warnings = [line for line in out.stderr.split("\n") if line.startswith("Warning:")]
             for w in warnings[:5]:
                 result.findings.append(Finding(
                     check="homebrew",

@@ -68,7 +68,7 @@ def run_all_checks(parallel: bool = True) -> CheckupReport:
                 name=fn.__name__,
                 errors=[CheckError(
                     check=fn.__name__, error_code=ERR_TIMEOUT,
-                    message=f"Check timed out",
+                    message="Check timed out",
                     suggestion="Try running with --no-parallel or check if a subprocess is hanging",
                 )],
             )

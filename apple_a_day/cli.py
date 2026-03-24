@@ -184,7 +184,7 @@ def _cmd_trend(args):
     print(f"  Avg criticals: {trend['avg_criticals']}  |  Avg warnings: {trend['avg_warnings']}")
 
     if trend["recurring"]:
-        print(f"\n  Recurring issues:")
+        print("\n  Recurring issues:")
         for issue in trend["recurring"]:
             print(f"    \033[31m●\033[0m {issue}")
 
@@ -273,7 +273,7 @@ def _cmd_vitals(args):
     print(f"\n  Swap: current {swap.get('current_mb', '?')}MB  peak {swap.get('peak_mb', 0):.0f}MB")
 
     if offenders:
-        print(f"\n  Top offenders (by frequency in top-CPU list):")
+        print("\n  Top offenders (by frequency in top-CPU list):")
         for o in offenders[:7]:
             print(f"    {o['name']:30s}  seen {o['appearances']}x  peak {o['peak_cpu']}%")
 
@@ -283,7 +283,7 @@ def _cmd_vitals(args):
 def _fmt_load(load_list):
     if not load_list:
         return "?"
-    return "/".join(f"{l:.0f}" for l in load_list[:3])
+    return "/".join(f"{v:.0f}" for v in load_list[:3])
 
 
 def _cmd_install(_args):
@@ -316,7 +316,7 @@ def _cmd_profile(args):
 
     # Pretty print
     hw = profile.get("hardware", {})
-    print(f"\napple-a-day user profile")
+    print("\napple-a-day user profile")
     print(f"  {hw.get('cpu', '?')} | {hw.get('memory_gb', '?')} GB RAM"
           f" | {hw.get('disk_gb', '?')} GB disk | macOS {hw.get('os_version', '?')}")
     print(f"\n  User type: {profile.get('user_type', 'unknown')}")
@@ -344,7 +344,7 @@ def _cmd_profile(args):
         print(f"\n  Top commands: {', '.join(c['command'] for c in top)}")
 
     print(f"\n  Profiled: {profile.get('gathered_at', '?')[:19]}")
-    print(f"  Stored: ~/.config/eidos/mac-profile.json")
+    print("  Stored: ~/.config/eidos/mac-profile.json")
 
 
 def main(argv=None):
