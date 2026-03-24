@@ -24,8 +24,9 @@
 ## Preflight
 
 ### Steps
-1. `ruff check .` — lint must pass. This is what CI runs. HARD FAIL if errors.
-2. `pytest tests/ -x -q` — run all tests, stop on first failure
+1. `ruff check .` — lint rules. HARD FAIL if errors.
+2. `ruff format --check .` — formatting. HARD FAIL if errors. Fix with `ruff format .`
+3. `pytest tests/ -x -q` — run all tests, stop on first failure
 3. Secrets scan: grep staged files for `api_key|secret|password|token|credential` patterns. HARD FAIL if found.
 4. Untracked artifact scan: check for `.build/`, `node_modules/`, `*.o`, `*.egg-info/`, large binaries in untracked files. WARN before committing — these should be in .gitignore.
 5. Version check: ensure `__init__.py` version matches `pyproject.toml` version
