@@ -42,10 +42,19 @@ def check_shutdown_causes() -> CheckResult:
     causes = []
     try:
         out = subprocess.run(
-            ["log", "show", "--predicate",
-             'eventMessage contains "Previous shutdown cause"',
-             "--style", "compact", "--last", "7d"],
-            capture_output=True, text=True, timeout=30,
+            [
+                "log",
+                "show",
+                "--predicate",
+                'eventMessage contains "Previous shutdown cause"',
+                "--style",
+                "compact",
+                "--last",
+                "7d",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if out.returncode == 0:
             for line in out.stdout.strip().split("\n"):
@@ -63,7 +72,9 @@ def check_shutdown_causes() -> CheckResult:
         try:
             out = subprocess.run(
                 ["sysctl", "-n", "kern.shutdownreason"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if out.returncode == 0 and out.stdout.strip():
                 causes.append(("last boot", out.stdout.strip()))
@@ -71,11 +82,13 @@ def check_shutdown_causes() -> CheckResult:
             pass
 
     if not causes:
-        result.findings.append(Finding(
-            check="shutdown_causes",
-            severity=Severity.OK,
-            summary="No recent shutdown events found in logs",
-        ))
+        result.findings.append(
+            Finding(
+                check="shutdown_causes",
+                severity=Severity.OK,
+                summary="No recent shutdown events found in logs",
+            )
+        )
         return result
 
     # Analyze causes
@@ -96,19 +109,23 @@ def check_shutdown_causes() -> CheckResult:
 
         fix = _fix_for_cause(worst[1])
 
-        result.findings.append(Finding(
-            check="shutdown_causes",
-            severity=sev,
-            summary=f"{len(abnormal)} abnormal shutdown(s) in the last 7 days — worst: {label}",
-            details="\n".join(details_lines),
-            fix=fix,
-        ))
+        result.findings.append(
+            Finding(
+                check="shutdown_causes",
+                severity=sev,
+                summary=f"{len(abnormal)} abnormal shutdown(s) in the last 7 days — worst: {label}",
+                details="\n".join(details_lines),
+                fix=fix,
+            )
+        )
     else:
-        result.findings.append(Finding(
-            check="shutdown_causes",
-            severity=Severity.OK,
-            summary=f"All {len(causes)} recent shutdown(s) were clean",
-        ))
+        result.findings.append(
+            Finding(
+                check="shutdown_causes",
+                severity=Severity.OK,
+                summary=f"All {len(causes)} recent shutdown(s) were clean",
+            )
+        )
 
     return result
 
@@ -116,22 +133,34 @@ def check_shutdown_causes() -> CheckResult:
 def _fix_for_cause(code: str) -> str:
     """Return a targeted fix suggestion for a shutdown cause code."""
     fixes = {
-        "-1": ("Kernel panic — run `aad checkup -c kernel_panics` for details. "
-               "Check for bad RAM, faulty peripherals, or kext issues."),
-        "-2": ("Watchdog-triggered kernel panic — a subsystem hung for too long. "
-               "Check for stuck I/O (external drives, network mounts)."),
-        "-3": ("Thermal emergency — Mac shut down to prevent hardware damage. "
-               "Check fans, vents, and ambient temperature. "
-               "Run `aad checkup -c thermal` for current thermal state."),
-        "-74": ("Temperature sensor triggered shutdown. "
-               "Same as thermal emergency — check cooling and workload."),
+        "-1": (
+            "Kernel panic — run `aad checkup -c kernel_panics` for details. "
+            "Check for bad RAM, faulty peripherals, or kext issues."
+        ),
+        "-2": (
+            "Watchdog-triggered kernel panic — a subsystem hung for too long. "
+            "Check for stuck I/O (external drives, network mounts)."
+        ),
+        "-3": (
+            "Thermal emergency — Mac shut down to prevent hardware damage. "
+            "Check fans, vents, and ambient temperature. "
+            "Run `aad checkup -c thermal` for current thermal state."
+        ),
+        "-74": (
+            "Temperature sensor triggered shutdown. "
+            "Same as thermal emergency — check cooling and workload."
+        ),
         "-62": "bridgeOS/T2 crash — firmware issue. Check for macOS updates.",
         "-71": "SOC watchdog — Apple Silicon subsystem timeout. Check for macOS updates.",
         "-64": "Battery ran out. Check battery health in System Information.",
         "-104": "Battery health triggered shutdown. Check battery cycle count and consider replacement.",
-        "-128": ("Forced power off — either user held power button or system lost power. "
-                "If you didn't do this, check power supply and sleep/wake issues."),
-        "7": ("Sleep/wake failure — Mac couldn't wake properly. "
-              "Check for peripherals that interfere with sleep, or disable Power Nap."),
+        "-128": (
+            "Forced power off — either user held power button or system lost power. "
+            "If you didn't do this, check power supply and sleep/wake issues."
+        ),
+        "7": (
+            "Sleep/wake failure — Mac couldn't wake properly. "
+            "Check for peripherals that interfere with sleep, or disable Power Nap."
+        ),
     }
     return fixes.get(code, "Investigate the shutdown cause code in Console.app or `log show`.")

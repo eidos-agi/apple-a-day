@@ -116,8 +116,18 @@ def generate_report(as_json: bool = False, vitals_minutes: int = 60) -> str | di
         }
 
     return _render_ansi(
-        overall, grade, matrix, criticals, warnings, infos,
-        load_data, spikes, offenders, trend_direction, vitals, report,
+        overall,
+        grade,
+        matrix,
+        criticals,
+        warnings,
+        infos,
+        load_data,
+        spikes,
+        offenders,
+        trend_direction,
+        vitals,
+        report,
     )
 
 
@@ -135,8 +145,15 @@ def _compute_matrix(report) -> dict:
         "network": ["Network"],
     }
     weights = {
-        "stability": 3, "cpu": 3, "memory": 2, "thermal": 2,
-        "storage": 2, "services": 2, "security": 1, "infra": 1, "network": 1,
+        "stability": 3,
+        "cpu": 3,
+        "memory": 2,
+        "thermal": 2,
+        "storage": 2,
+        "services": 2,
+        "security": 1,
+        "infra": 1,
+        "network": 1,
     }
 
     check_scores = {}
@@ -187,44 +204,66 @@ def _pick_focus(criticals, warnings, spikes, offenders) -> list[str]:
         for c in criticals:
             by_check.setdefault(c["check"], []).append(c)
         for check, items in sorted(by_check.items(), key=lambda x: -len(x[1])):
-            focus.append(f"FIX: {check} — {len(items)} critical issue(s). {items[0].get('fix', '')[:80]}")
+            focus.append(
+                f"FIX: {check} — {len(items)} critical issue(s). {items[0].get('fix', '')[:80]}"
+            )
             if len(focus) >= 2:
                 break
 
     if spikes:
         ongoing = [s for s in spikes if s.get("ongoing")]
         if ongoing:
-            focus.append(f"NOW: Active load spike (peak {ongoing[0]['peak_load']:.0f}x) — "
-                         f"{', '.join(p[1] for p in ongoing[0].get('top_processes', []))}")
+            focus.append(
+                f"NOW: Active load spike (peak {ongoing[0]['peak_load']:.0f}x) — "
+                f"{', '.join(p[1] for p in ongoing[0].get('top_processes', []))}"
+            )
 
     if warnings and len(focus) < 3:
         focus.append(f"REVIEW: {len(warnings)} warning(s) — {warnings[0]['summary'][:60]}")
 
     if offenders and len(focus) < 3:
         top = offenders[0]
-        focus.append(f"WATCH: {top['name']} appears in top-CPU {top['appearances']}x (peak {top['peak_cpu']}%)")
+        focus.append(
+            f"WATCH: {top['name']} appears in top-CPU {top['appearances']}x (peak {top['peak_cpu']}%)"
+        )
 
     return focus[:3]
 
 
-def _render_ansi(overall, grade, matrix, criticals, warnings, _infos,
-                 _load_data, spikes, offenders, trend, _vitals, report) -> str:
+def _render_ansi(
+    overall,
+    grade,
+    matrix,
+    criticals,
+    warnings,
+    _infos,
+    _load_data,
+    spikes,
+    offenders,
+    trend,
+    _vitals,
+    report,
+) -> str:
     """Render the report as ANSI text with ASCII graphs."""
     lines = []
     cores = os.cpu_count() or 8
     w = 72
 
     # ── Header ──
-    grade_color = {
-        "A": GREEN, "B": GREEN, "C": YELLOW, "D": RED, "F": RED
-    }.get(grade, WHITE)
+    grade_color = {"A": GREEN, "B": GREEN, "C": YELLOW, "D": RED, "F": RED}.get(grade, WHITE)
 
     lines.append("")
     lines.append(_c("╔" + "═" * (w - 2) + "╗", DIM))
     title = "  apple-a-day health report"
     grade_str = f"{grade} ({overall}/100)"
     pad = w - 4 - len(title) - len(grade_str)
-    lines.append(_c("║", DIM) + _c(title, BOLD) + " " * pad + _c(grade_str, grade_color, BOLD) + _c("  ║", DIM))
+    lines.append(
+        _c("║", DIM)
+        + _c(title, BOLD)
+        + " " * pad
+        + _c(grade_str, grade_color, BOLD)
+        + _c("  ║", DIM)
+    )
 
     info = report.mac_info
     subtitle = f"  macOS {info.get('os_version', '?')} | {info.get('cpu', '?')} | {info.get('memory_gb', '?')} GB RAM"
@@ -240,14 +279,14 @@ def _render_ansi(overall, grade, matrix, criticals, warnings, _infos,
 
     dim_labels = {
         "stability": "Stability ",
-        "cpu":       "CPU       ",
-        "thermal":   "Thermal   ",
-        "memory":    "Memory    ",
-        "storage":   "Storage   ",
-        "services":  "Services  ",
-        "security":  "Security  ",
-        "infra":     "Infra     ",
-        "network":   "Network   ",
+        "cpu": "CPU       ",
+        "thermal": "Thermal   ",
+        "memory": "Memory    ",
+        "storage": "Storage   ",
+        "services": "Services  ",
+        "security": "Security  ",
+        "infra": "Infra     ",
+        "network": "Network   ",
     }
 
     for dim, label in dim_labels.items():
@@ -273,7 +312,9 @@ def _render_ansi(overall, grade, matrix, criticals, warnings, _infos,
                 for s in spikes[:3]:
                     ongoing = _c(" ONGOING", RED, BOLD) if s.get("ongoing") else ""
                     procs = ", ".join(f"{p[1]}" for p in s.get("top_processes", [])[:3])
-                    lines.append(f"  {_c('▲', RED)} spike peak {s['peak_load']:.0f}x — {procs}{ongoing}")
+                    lines.append(
+                        f"  {_c('▲', RED)} spike peak {s['peak_load']:.0f}x — {procs}{ongoing}"
+                    )
 
             lines.append("")
 
@@ -284,7 +325,9 @@ def _render_ansi(overall, grade, matrix, criticals, warnings, _infos,
         for o in offenders[:7]:
             bar_w = int(o["appearances"] / max(max_appearances, 1) * 20)
             bar = "▓" * bar_w + "░" * (20 - bar_w)
-            lines.append(f"  {o['name']:25s} {_c(bar, CYAN)} {o['appearances']}x  peak {o['peak_cpu']}%")
+            lines.append(
+                f"  {o['name']:25s} {_c(bar, CYAN)} {o['appearances']}x  peak {o['peak_cpu']}%"
+            )
         lines.append("")
 
     # ── Critical Issues ──
@@ -316,8 +359,11 @@ def _render_ansi(overall, grade, matrix, criticals, warnings, _infos,
 
     # ── Trend ──
     if trend:
-        arrow = {"improving": _c("↑ improving", GREEN), "degrading": _c("↓ degrading", RED),
-                 "stable": _c("→ stable", DIM)}.get(trend, "")
+        arrow = {
+            "improving": _c("↑ improving", GREEN),
+            "degrading": _c("↓ degrading", RED),
+            "stable": _c("→ stable", DIM),
+        }.get(trend, "")
         lines.append(_c("── Trend ", BOLD) + _c("─" * (w - 10), DIM))
         lines.append(f"  Direction: {arrow}")
         lines.append("")
@@ -332,7 +378,7 @@ def _render_ansi(overall, grade, matrix, criticals, warnings, _infos,
             # Wrap long lines
             line = f"  {i}. {f}"
             if len(line) > w - 4:
-                line = line[:w - 7] + "..."
+                line = line[: w - 7] + "..."
             pad = w - 2 - len(line)
             lines.append(_c("║", DIM) + line + " " * max(pad, 0) + _c("║", DIM))
         lines.append(_c("╚" + "═" * (w - 2) + "╝", BOLD))

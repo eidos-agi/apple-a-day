@@ -15,9 +15,11 @@ def _get_renderer():
     """Auto-detect: use Rich if installed, fall back to ANSI."""
     try:
         from .format_rich import render_report
+
         return render_report
     except ImportError:
         from .format_ansi import render_report
+
         return render_report
 
 
@@ -29,8 +31,11 @@ def _cmd_checkup(args):
     results = report.results
     if args.check:
         check_lower = {c.lower() for c in args.check}
-        results = [r for r in results if r.name.lower().replace(" ", "_") in check_lower
-                   or r.name.lower() in check_lower]
+        results = [
+            r
+            for r in results
+            if r.name.lower().replace(" ", "_") in check_lower or r.name.lower() in check_lower
+        ]
 
     if args.json:
         output = {
@@ -80,12 +85,17 @@ def _cmd_score(args):
     latest = entries[-1]
 
     if args.score_json:
-        print(json.dumps({
-            "ts": latest.get("ts"),
-            "score": latest.get("score"),
-            "grade": latest.get("grade"),
-            "matrix": latest.get("matrix", {}),
-        }, indent=2))
+        print(
+            json.dumps(
+                {
+                    "ts": latest.get("ts"),
+                    "score": latest.get("score"),
+                    "grade": latest.get("grade"),
+                    "matrix": latest.get("matrix", {}),
+                },
+                indent=2,
+            )
+        )
         return
 
     score = latest.get("score", 0)
@@ -94,7 +104,13 @@ def _cmd_score(args):
     ts = latest.get("ts", "?")[:19]
 
     # Color the grade
-    grade_colors = {"A": "\033[32m", "B": "\033[32m", "C": "\033[33m", "D": "\033[31m", "F": "\033[31m"}
+    grade_colors = {
+        "A": "\033[32m",
+        "B": "\033[32m",
+        "C": "\033[33m",
+        "D": "\033[31m",
+        "F": "\033[31m",
+    }
     gc = grade_colors.get(grade, "")
 
     print(f"\napple-a-day health score  {gc}{grade} ({score}/100)\033[0m  {ts}")
@@ -179,7 +195,9 @@ def _cmd_trend(args):
         return
 
     direction = "\033[32m↑ improving\033[0m" if trend["improving"] else "\033[31m↓ degrading\033[0m"
-    print(f"\napple-a-day health trend ({trend['entries']} checkups, {trend['first']} → {trend['last']})")
+    print(
+        f"\napple-a-day health trend ({trend['entries']} checkups, {trend['first']} → {trend['last']})"
+    )
     print(f"  Direction: {direction}")
     print(f"  Avg criticals: {trend['avg_criticals']}  |  Avg warnings: {trend['avg_warnings']}")
 
@@ -193,17 +211,20 @@ def _cmd_report(args):
     """Generate a focused health report."""
     if args.html:
         from .report_html import open_report
+
         path = open_report(vitals_minutes=args.minutes)
         print(f"Report opened: {path}")
         return
 
     if args.report_json:
         from .report import generate_report
+
         result = generate_report(as_json=True, vitals_minutes=args.minutes)
         print(json.dumps(result, indent=2))
         return
 
     from .report import generate_report
+
     print(generate_report(as_json=False, vitals_minutes=args.minutes))
 
 
@@ -218,9 +239,11 @@ def _cmd_monitor(args):
         else:
             load = s.get("load", [0, 0, 0])
             top = s.get("top", [])
-            print(f"Sampled: load {load[0]:.1f}/{load[1]:.1f}/{load[2]:.1f}"
-                  f"  thermal={s.get('thermal', '?')}"
-                  f"  swap={s.get('swap_mb', '?')}MB")
+            print(
+                f"Sampled: load {load[0]:.1f}/{load[1]:.1f}/{load[2]:.1f}"
+                f"  thermal={s.get('thermal', '?')}"
+                f"  swap={s.get('swap_mb', '?')}MB"
+            )
             if top:
                 for cpu, name in top[:3]:
                     print(f"  {name}: {cpu}%")
@@ -252,9 +275,11 @@ def _cmd_vitals(args):
     offenders = analysis.get("worst_offenders", [])
 
     print(f"\napple-a-day vitals ({analysis['samples']} samples, last {args.minutes}min)")
-    print(f"\n  Load: current {_fmt_load(load.get('current', []))}  "
-          f"peak {load.get('peak_1m', 0):.0f}  avg {load.get('avg_1m', 0):.1f}  "
-          f"({load.get('cores', '?')} cores)")
+    print(
+        f"\n  Load: current {_fmt_load(load.get('current', []))}  "
+        f"peak {load.get('peak_1m', 0):.0f}  avg {load.get('avg_1m', 0):.1f}  "
+        f"({load.get('cores', '?')} cores)"
+    )
 
     if spikes:
         print(f"\n  \033[31m{len(spikes)} load spike(s) detected:\033[0m")
@@ -266,9 +291,11 @@ def _cmd_vitals(args):
                 print(f"      culprits: {procs}")
 
     t_level = {0: "nominal", 1: "moderate", 2: "heavy", 3: "trapping", 4: "sleeping"}
-    print(f"\n  Thermal: current {t_level.get(thermal.get('current', 0), '?')}  "
-          f"peak {t_level.get(thermal.get('peak', 0), '?')}  "
-          f"above-nominal {thermal.get('time_above_nominal_pct', 0):.0f}% of time")
+    print(
+        f"\n  Thermal: current {t_level.get(thermal.get('current', 0), '?')}  "
+        f"peak {t_level.get(thermal.get('peak', 0), '?')}  "
+        f"above-nominal {thermal.get('time_above_nominal_pct', 0):.0f}% of time"
+    )
 
     print(f"\n  Swap: current {swap.get('current_mb', '?')}MB  peak {swap.get('peak_mb', 0):.0f}MB")
 
@@ -289,18 +316,21 @@ def _fmt_load(load_list):
 def _cmd_install(_args):
     """Install the vitals monitor daemon."""
     from .launchd import install
+
     print(install())
 
 
 def _cmd_uninstall(_args):
     """Remove the vitals monitor daemon."""
     from .launchd import uninstall
+
     print(uninstall())
 
 
 def _cmd_status(_args):
     """Check daemon status."""
     from .launchd import status
+
     print(status())
 
 
@@ -317,8 +347,10 @@ def _cmd_profile(args):
     # Pretty print
     hw = profile.get("hardware", {})
     print("\napple-a-day user profile")
-    print(f"  {hw.get('cpu', '?')} | {hw.get('memory_gb', '?')} GB RAM"
-          f" | {hw.get('disk_gb', '?')} GB disk | macOS {hw.get('os_version', '?')}")
+    print(
+        f"  {hw.get('cpu', '?')} | {hw.get('memory_gb', '?')} GB RAM"
+        f" | {hw.get('disk_gb', '?')} GB disk | macOS {hw.get('os_version', '?')}"
+    )
     print(f"\n  User type: {profile.get('user_type', 'unknown')}")
     print(f"  Tags: {', '.join(profile.get('tags', []))}")
 
@@ -361,12 +393,24 @@ def main(argv=None):
     p_checkup = sub.add_parser("checkup", help="Run all health checks")
     p_checkup.add_argument("--json", action="store_true", help="Output as JSON")
     p_checkup.add_argument("--no-parallel", action="store_true", help="Run checks sequentially")
-    p_checkup.add_argument("-c", "--check", action="append", default=[],
-                           help="Run only specific check(s) by name (repeatable)")
-    p_checkup.add_argument("--min-severity", choices=SEVERITY_ORDER, default="ok",
-                           help="Only show findings at or above this severity")
-    p_checkup.add_argument("--fields", type=lambda s: set(s.split(",")),
-                           help="Comma-separated fields to include in JSON output")
+    p_checkup.add_argument(
+        "-c",
+        "--check",
+        action="append",
+        default=[],
+        help="Run only specific check(s) by name (repeatable)",
+    )
+    p_checkup.add_argument(
+        "--min-severity",
+        choices=SEVERITY_ORDER,
+        default="ok",
+        help="Only show findings at or above this severity",
+    )
+    p_checkup.add_argument(
+        "--fields",
+        type=lambda s: set(s.split(",")),
+        help="Comma-separated fields to include in JSON output",
+    )
 
     # schema
     sub.add_parser("schema", help="Show JSON schema of all checks and output format")
@@ -374,7 +418,9 @@ def main(argv=None):
     # profile
     p_profile = sub.add_parser("profile", help="Show or refresh Mac user profile")
     p_profile.add_argument("--refresh", action="store_true", help="Force re-gather profile data")
-    p_profile.add_argument("--json", action="store_true", dest="profile_json", help="Output as JSON")
+    p_profile.add_argument(
+        "--json", action="store_true", dest="profile_json", help="Output as JSON"
+    )
 
     # score
     p_score = sub.add_parser("score", help="Show health score matrix from latest checkup")
@@ -393,17 +439,25 @@ def main(argv=None):
     p_report = sub.add_parser("report", help="Focused health report with ASCII graphs")
     p_report.add_argument("--json", action="store_true", dest="report_json", help="Output as JSON")
     p_report.add_argument("--html", action="store_true", help="Open report in browser")
-    p_report.add_argument("--minutes", type=int, default=60, help="Vitals lookback in minutes (default: 60)")
+    p_report.add_argument(
+        "--minutes", type=int, default=60, help="Vitals lookback in minutes (default: 60)"
+    )
 
     # monitor
     p_monitor = sub.add_parser("monitor", help="Sample system vitals over time")
     p_monitor.add_argument("--once", action="store_true", help="Take a single sample and exit")
-    p_monitor.add_argument("--interval", type=int, default=60, help="Seconds between samples (default: 60)")
-    p_monitor.add_argument("--json", action="store_true", dest="monitor_json", help="Output as JSON")
+    p_monitor.add_argument(
+        "--interval", type=int, default=60, help="Seconds between samples (default: 60)"
+    )
+    p_monitor.add_argument(
+        "--json", action="store_true", dest="monitor_json", help="Output as JSON"
+    )
 
     # vitals
     p_vitals = sub.add_parser("vitals", help="Analyze recent vitals history")
-    p_vitals.add_argument("--minutes", type=int, default=60, help="Look back N minutes (default: 60)")
+    p_vitals.add_argument(
+        "--minutes", type=int, default=60, help="Look back N minutes (default: 60)"
+    )
     p_vitals.add_argument("--json", action="store_true", dest="vitals_json", help="Output as JSON")
 
     # install / uninstall / status (daemon management)

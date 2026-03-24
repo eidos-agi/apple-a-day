@@ -21,9 +21,9 @@ class AppUsage(NamedTuple):
     name: str
     path: str
     last_used: datetime | None  # kMDItemLastUsedDate
-    use_count: int              # kMDItemUseCount
-    date_added: datetime | None # kMDItemDateAdded
-    days_dormant: int           # days since last use (or since added if never used)
+    use_count: int  # kMDItemUseCount
+    date_added: datetime | None  # kMDItemDateAdded
+    days_dormant: int  # days since last use (or since added if never used)
     size_mb: float
 
 
@@ -127,17 +127,17 @@ def find_replacements(
 
             # Check for overlap signals
             signals = _overlap_signals(
-                stale_usage, stale_meta,
-                active_usage, active_meta,
+                stale_usage,
+                stale_meta,
+                active_usage,
+                active_meta,
             )
 
             if not signals:
                 continue  # No evidence these apps are related
 
             # Calculate confidence
-            confidence = _calculate_confidence(
-                stale_usage, active_usage, signals
-            )
+            confidence = _calculate_confidence(stale_usage, active_usage, signals)
 
             if confidence > best_conf and confidence >= 0.3:
                 reason = ". ".join(signals)
@@ -157,22 +157,28 @@ def find_replacements(
 
 
 def _overlap_signals(
-    stale_usage: AppUsage, stale_meta: dict,
-    active_usage: AppUsage, active_meta: dict,
+    stale_usage: AppUsage,
+    stale_meta: dict,
+    active_usage: AppUsage,
+    active_meta: dict,
 ) -> list[str]:
     """Check if two apps have enough in common to be potential replacements."""
     signals = []
 
     # 1. Synonym group (strongest signal)
     from .app_similarity import _known_synonym_score
+
     if _known_synonym_score(stale_usage.name, active_usage.name) > 0:
         signals.append("known competitors")
 
     # 2. Same category (medium signal, skip broad categories)
     cat_a = stale_meta.get("category", "")
     cat_b = active_meta.get("category", "")
-    broad = {"public.app-category.utilities", "public.app-category.productivity",
-             "public.app-category.business"}
+    broad = {
+        "public.app-category.utilities",
+        "public.app-category.productivity",
+        "public.app-category.business",
+    }
     if cat_a and cat_b and cat_a == cat_b and cat_a not in broad:
         label = cat_a.replace("public.app-category.", "").replace("-", " ")
         signals.append(f"both in '{label}' category")
@@ -186,8 +192,15 @@ def _overlap_signals(
     # 4. Shared UTIs (medium signal)
     utis_a = stale_meta.get("utis", set())
     utis_b = active_meta.get("utis", set())
-    generic = {"public.data", "public.item", "public.content", "public.text",
-               "public.plain-text", "public.image", "public.movie"}
+    generic = {
+        "public.data",
+        "public.item",
+        "public.content",
+        "public.text",
+        "public.plain-text",
+        "public.image",
+        "public.movie",
+    }
     shared = (utis_a & utis_b) - generic
     if shared:
         types = [t.split(".")[-1] for t in sorted(shared)[:3]]
@@ -254,9 +267,7 @@ def _get_lightweight_meta(app_path: str) -> dict:
             with open(plist_path, "rb") as f:
                 info = plistlib.load(f)
             result["category"] = info.get("LSApplicationCategoryType", "")
-            result["vendor"] = ".".join(
-                info.get("CFBundleIdentifier", "").split(".")[:2]
-            )
+            result["vendor"] = ".".join(info.get("CFBundleIdentifier", "").split(".")[:2])
             utis = set()
             for dt in info.get("CFBundleDocumentTypes", []):
                 for uti in dt.get("LSItemContentTypes", []):
@@ -273,8 +284,10 @@ def _get_lightweight_meta(app_path: str) -> dict:
 def _mdls(app_path: str) -> dict:
     """Query Spotlight metadata for an app."""
     fields = [
-        "kMDItemLastUsedDate", "kMDItemUseCount",
-        "kMDItemDateAdded", "kMDItemContentCreationDate",
+        "kMDItemLastUsedDate",
+        "kMDItemUseCount",
+        "kMDItemDateAdded",
+        "kMDItemContentCreationDate",
     ]
     result = {}
     try:

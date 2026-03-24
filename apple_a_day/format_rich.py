@@ -20,11 +20,16 @@ def render_report(report, results, severity_order, min_idx):
 
     info = report.mac_info
     console.print("[bold]apple-a-day checkup[/bold]")
-    mac_line = " | ".join(filter(None, [
-        f"macOS {info.get('os_version', '?')}",
-        info.get("cpu", ""),
-        f"{info.get('memory_gb', '?')} GB RAM" if "memory_gb" in info else None,
-    ]))
+    mac_line = " | ".join(
+        filter(
+            None,
+            [
+                f"macOS {info.get('os_version', '?')}",
+                info.get("cpu", ""),
+                f"{info.get('memory_gb', '?')} GB RAM" if "memory_gb" in info else None,
+            ],
+        )
+    )
     console.print(f"[dim]{mac_line}[/dim]")
     console.print()
 
@@ -49,8 +54,9 @@ def render_report(report, results, severity_order, min_idx):
         console.print(table)
         console.print()
 
-    all_findings = [f for r in results for f in r.findings
-                    if severity_order.index(f.severity.value) >= min_idx]
+    all_findings = [
+        f for r in results for f in r.findings if severity_order.index(f.severity.value) >= min_idx
+    ]
     crits = sum(1 for f in all_findings if f.severity == Severity.CRITICAL)
     warns = sum(1 for f in all_findings if f.severity == Severity.WARNING)
 

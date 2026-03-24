@@ -8,11 +8,13 @@ def get_schema() -> dict:
     """Return JSON-serializable schema describing all checks and output format."""
     checks = []
     for fn in ALL_CHECKS:
-        checks.append({
-            "name": fn.__name__.replace("check_", ""),
-            "function": fn.__name__,
-            "description": (fn.__doc__ or "").strip().split("\n")[0],
-        })
+        checks.append(
+            {
+                "name": fn.__name__.replace("check_", ""),
+                "function": fn.__name__,
+                "description": (fn.__doc__ or "").strip().split("\n")[0],
+            }
+        )
 
     return {
         "tool": "apple-a-day",

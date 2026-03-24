@@ -40,20 +40,24 @@ def check_crash_loops(hours: int = 24) -> CheckResult:
         else:
             severity = Severity.INFO
 
-        result.findings.append(Finding(
-            check="crash_loops",
-            severity=severity,
-            summary=f"{process} crashed {count} times in the last {hours}h",
-            details="Crash reports found in DiagnosticReports directories.",
-            fix=f"Check: `log show --predicate 'process == \"{process}\"' --last {hours}h`"
+        result.findings.append(
+            Finding(
+                check="crash_loops",
+                severity=severity,
+                summary=f"{process} crashed {count} times in the last {hours}h",
+                details="Crash reports found in DiagnosticReports directories.",
+                fix=f"Check: `log show --predicate 'process == \"{process}\"' --last {hours}h`"
                 f" or reinstall the service.",
-        ))
+            )
+        )
 
     if not result.findings:
-        result.findings.append(Finding(
-            check="crash_loops",
-            severity=Severity.OK,
-            summary=f"No crash loops detected in the last {hours}h",
-        ))
+        result.findings.append(
+            Finding(
+                check="crash_loops",
+                severity=Severity.OK,
+                summary=f"No crash loops detected in the last {hours}h",
+            )
+        )
 
     return result

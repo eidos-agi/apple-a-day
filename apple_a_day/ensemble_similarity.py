@@ -37,7 +37,13 @@ def ensemble_score(meta_a: dict, meta_b: dict) -> tuple[float, list[str]]:
     if vocab_a and vocab_b:
         jaccard = _jaccard(vocab_a, vocab_b)
         if jaccard > 0.05:
-            votes.append((min(jaccard * 4, 1.0), 2.0, f"shared UI vocabulary ({len(vocab_a & vocab_b)} words)"))
+            votes.append(
+                (
+                    min(jaccard * 4, 1.0),
+                    2.0,
+                    f"shared UI vocabulary ({len(vocab_a & vocab_b)} words)",
+                )
+            )
 
     # 4. Category + UTIs
     cat_score = _category_signal(meta_a, meta_b)
@@ -152,17 +158,46 @@ def _expand_concepts(words: set[str]) -> set[str]:
 
 
 _STOP_WORDS = {
-    "a", "an", "the", "and", "or", "for", "of", "in", "on", "to", "with",
-    "is", "it", "by", "as", "at", "from", "that", "this", "your", "app",
-    "native", "client", "official", "desktop", "tool", "software",
-    "application", "just", "one", "place", "focus",
+    "a",
+    "an",
+    "the",
+    "and",
+    "or",
+    "for",
+    "of",
+    "in",
+    "on",
+    "to",
+    "with",
+    "is",
+    "it",
+    "by",
+    "as",
+    "at",
+    "from",
+    "that",
+    "this",
+    "your",
+    "app",
+    "native",
+    "client",
+    "official",
+    "desktop",
+    "tool",
+    "software",
+    "application",
+    "just",
+    "one",
+    "place",
+    "focus",
 }
 
 
 def _tokenize(text: str) -> set[str]:
     """Tokenize text into meaningful lowercase words."""
     return {
-        w.lower() for w in text.split()
+        w.lower()
+        for w in text.split()
         if len(w) > 2 and w.lower() not in _STOP_WORDS and w.isalpha()
     }
 
@@ -194,8 +229,13 @@ def _uti_signal(meta_a: dict, meta_b: dict) -> float:
     utis_a = meta_a.get("utis", set())
     utis_b = meta_b.get("utis", set())
     generic = {
-        "public.data", "public.item", "public.content", "public.text",
-        "public.plain-text", "public.image", "public.movie",
+        "public.data",
+        "public.item",
+        "public.content",
+        "public.text",
+        "public.plain-text",
+        "public.image",
+        "public.movie",
         "public.composite-content",
     }
     a = utis_a - generic

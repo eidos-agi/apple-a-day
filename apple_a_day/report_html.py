@@ -25,6 +25,7 @@ TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 # ── SVG helpers (registered as Jinja2 globals) ──
 
+
 def _donut_svg(score: int, grade: str, color: str, size: int = 130) -> str:
     r = size // 2 - 10
     cx = cy = size // 2
@@ -43,17 +44,19 @@ def _donut_svg(score: int, grade: str, color: str, size: int = 130) -> str:
         f'<text x="{cx}" y="{cy + 14}" text-anchor="middle" '
         f'font-size="13" fill="#64748b" '
         f'font-family="SF Mono, monospace">{score}/100</text>'
-        f'</svg>'
+        f"</svg>"
     )
 
 
 def _bar_svg(value: int, max_val: int = 100, width: int = 200, height: int = 18) -> str:
     filled = int(value / max_val * width)
     color = "#22c55e" if value >= 80 else "#eab308" if value >= 50 else "#ef4444"
-    return (f'<svg width="{width}" height="{height}">'
-            f'<rect width="{width}" height="{height}" rx="3" fill="#e2e8f0"/>'
-            f'<rect width="{filled}" height="{height}" rx="3" fill="{color}"/>'
-            f'</svg>')
+    return (
+        f'<svg width="{width}" height="{height}">'
+        f'<rect width="{width}" height="{height}" rx="3" fill="#e2e8f0"/>'
+        f'<rect width="{filled}" height="{height}" rx="3" fill="{color}"/>'
+        f"</svg>"
+    )
 
 
 def _sparkline_svg(values: list[float], width: int = 500, height: int = 60) -> str:
@@ -71,10 +74,12 @@ def _sparkline_svg(values: list[float], width: int = 500, height: int = 60) -> s
         points.append(f"{x:.1f},{y:.1f}")
     polyline = " ".join(points)
     area = f"0,{height} " + polyline + f" {width},{height}"
-    return (f'<svg width="{width}" height="{height}" style="display:block">'
-            f'<polygon points="{area}" fill="rgba(14,116,144,0.12)"/>'
-            f'<polyline points="{polyline}" fill="none" stroke="#0e7490" stroke-width="1.5"/>'
-            f'</svg>')
+    return (
+        f'<svg width="{width}" height="{height}" style="display:block">'
+        f'<polygon points="{area}" fill="rgba(14,116,144,0.12)"/>'
+        f'<polyline points="{polyline}" fill="none" stroke="#0e7490" stroke-width="1.5"/>'
+        f"</svg>"
+    )
 
 
 def _mini_sparkline(values: list[float], width: int = 80, height: int = 16) -> str:
@@ -87,19 +92,22 @@ def _mini_sparkline(values: list[float], width: int = 80, height: int = 16) -> s
         x = i / max(len(values) - 1, 1) * width
         y = height - ((v - mn) / rng * (height - 2)) - 1
         points.append(f"{x:.0f},{y:.0f}")
-    return (f'<svg width="{width}" height="{height}" style="vertical-align:middle">'
-            f'<polyline points="{" ".join(points)}" fill="none" stroke="#0e7490" stroke-width="1.5"/>'
-            f'</svg>')
-
+    return (
+        f'<svg width="{width}" height="{height}" style="vertical-align:middle">'
+        f'<polyline points="{" ".join(points)}" fill="none" stroke="#0e7490" stroke-width="1.5"/>'
+        f"</svg>"
+    )
 
 
 def _cpu_bar(cpu_str: str, max_cpu: float) -> str:
     cpu = float(cpu_str)
     bar_w = int(cpu / max(max_cpu, 1) * 140)
     color = "#ef4444" if cpu > 50 else "#ca8a04" if cpu > 20 else "#0284c7"
-    return (f'<div style="display:flex;align-items:center;gap:6px">'
-            f'<div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div>'
-            f'<span class="mono">{cpu_str}%</span></div>')
+    return (
+        f'<div style="display:flex;align-items:center;gap:6px">'
+        f'<div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div>'
+        f'<span class="mono">{cpu_str}%</span></div>'
+    )
 
 
 def _mem_bar(mem_str: str, max_mem: float, ram_gb: int) -> str:
@@ -107,9 +115,11 @@ def _mem_bar(mem_str: str, max_mem: float, ram_gb: int) -> str:
     mem_gb = round(mem_pct / 100 * ram_gb, 1)
     bar_w = int(mem_pct / max(max_mem, 1) * 140)
     color = "#ef4444" if mem_pct > 10 else "#ca8a04" if mem_pct > 5 else "#0284c7"
-    return (f'<div style="display:flex;align-items:center;gap:6px">'
-            f'<div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div>'
-            f'<span class="mono">{mem_gb} GB</span></div>')
+    return (
+        f'<div style="display:flex;align-items:center;gap:6px">'
+        f'<div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div>'
+        f'<span class="mono">{mem_gb} GB</span></div>'
+    )
 
 
 def _mem_gb(mem_str: str, ram_gb: int) -> str:
@@ -120,25 +130,35 @@ def _size_bar(size_mb: int, max_size: int) -> str:
     bar_w = int(size_mb / max(max_size, 1) * 140)
     size_str = f"{size_mb} MB" if size_mb < 1024 else f"{size_mb / 1024:.1f} GB"
     color = "#ef4444" if size_mb > 500 else "#ca8a04" if size_mb > 100 else "#0284c7"
-    return (f'<div style="display:flex;align-items:center;gap:6px">'
-            f'<div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div>'
-            f'<span class="mono">{size_str}</span></div>')
+    return (
+        f'<div style="display:flex;align-items:center;gap:6px">'
+        f'<div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div>'
+        f'<span class="mono">{size_str}</span></div>'
+    )
 
 
 def _bar_html(value: float, max_val: float, threshold: float) -> str:
     bar_w = int(value / max(max_val, 1) * 140)
     color = "#ef4444" if threshold > 30 else "#ca8a04" if threshold > 10 else "#0284c7"
-    return (f'<div style="display:flex;align-items:center;gap:6px">'
-            f'<div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div>'
-            f'<span class="mono">{value:.0f}%·s</span></div>')
+    return (
+        f'<div style="display:flex;align-items:center;gap:6px">'
+        f'<div style="width:{bar_w}px;height:12px;background:{color};border-radius:2px"></div>'
+        f'<span class="mono">{value:.0f}%·s</span></div>'
+    )
 
 
 def _sev_badge(severity: str) -> str:
-    colors = {"critical": ("#ef4444", "#fff"), "warning": ("#ca8a04", "#fff"),
-              "info": ("#3b82f6", "#fff"), "ok": ("#22c55e", "#fff")}
+    colors = {
+        "critical": ("#ef4444", "#fff"),
+        "warning": ("#ca8a04", "#fff"),
+        "info": ("#3b82f6", "#fff"),
+        "ok": ("#22c55e", "#fff"),
+    }
     bg, fg = colors.get(severity, ("#64748b", "#fff"))
-    return (f'<span style="background:{bg};color:{fg};padding:1px 8px;border-radius:3px;'
-            f'font-size:11px;font-weight:600;text-transform:uppercase">{severity}</span>')
+    return (
+        f'<span style="background:{bg};color:{fg};padding:1px 8px;border-radius:3px;'
+        f'font-size:11px;font-weight:600;text-transform:uppercase">{severity}</span>'
+    )
 
 
 def _knowledge_card(topic_keys: list[str]) -> str:
@@ -148,15 +168,18 @@ def _knowledge_card(topic_keys: list[str]) -> str:
         if not topic:
             continue
         title = key.replace("_", " ").title()
-        html += (f'<details class="knowledge"><summary>{title} — what is this?</summary>'
-                 f'<div class="k-section"><b>What:</b> {topic["what"]}</div>'
-                 f'<div class="k-section"><b>Why it matters:</b> {topic["why"]}</div>'
-                 f'<div class="k-section"><b>How to fix:</b><br>{topic["fix"].replace(chr(10), "<br>")}</div>'
-                 f'</details>')
+        html += (
+            f'<details class="knowledge"><summary>{title} — what is this?</summary>'
+            f'<div class="k-section"><b>What:</b> {topic["what"]}</div>'
+            f'<div class="k-section"><b>Why it matters:</b> {topic["why"]}</div>'
+            f'<div class="k-section"><b>How to fix:</b><br>{topic["fix"].replace(chr(10), "<br>")}</div>'
+            f"</details>"
+        )
     return html
 
 
 # ── Process identification ──
+
 
 def _process_action(name: str, cmdline: str = "") -> str:
     system = {
@@ -173,8 +196,12 @@ def _process_action(name: str, cmdline: str = "") -> str:
     }
     if name in system:
         return system[name]
-    third_party = {"OneDrive": "Pause sync", "Dropbox": "Pause sync",
-                   "Docker Desktop": "Check resource limits", "prl_client_app": "Suspend VM"}
+    third_party = {
+        "OneDrive": "Pause sync",
+        "Dropbox": "Pause sync",
+        "Docker Desktop": "Check resource limits",
+        "prl_client_app": "Suspend VM",
+    }
     for key, advice in third_party.items():
         if key.lower() in name.lower():
             return advice
@@ -191,44 +218,74 @@ def _identify_from_cmdline(cmdline: str) -> str:
             for i, p in enumerate(parts):
                 if "uvicorn" in p or "gunicorn" in p:
                     app = parts[i + 1].split(":")[0] if i + 1 < len(parts) else "?"
-                    return f'Web server: <code>{app}</code>'
+                    return f"Web server: <code>{app}</code>"
         if " -m " in cmdline:
             module = cmdline.split(" -m ")[-1].strip().split()[0]
-            return f'Module: <code>{module}</code>'
+            return f"Module: <code>{module}</code>"
         for p in parts[1:]:
             if p.startswith("-"):
                 continue
             if "/bin/" in p and not p.rsplit("/", 1)[-1].startswith("python"):
-                return f'<code>{p.rsplit("/", 1)[-1]}</code>'
+                return f"<code>{p.rsplit('/', 1)[-1]}</code>"
             if p.endswith(".py"):
                 path_parts = p.rsplit("/", 2)
                 script = path_parts[-1].replace(".py", "")
                 parent = path_parts[-2] if len(path_parts) >= 2 else ""
-                return f'Script: <code>{parent}/{script}</code>' if parent else f'Script: <code>{script}</code>'
+                return (
+                    f"Script: <code>{parent}/{script}</code>"
+                    if parent
+                    else f"Script: <code>{script}</code>"
+                )
             break
     if "node" in binary.lower():
         for p in parts[1:]:
             if p.endswith(".js") or p.endswith(".ts"):
-                return f'<code>{p.rsplit("/", 1)[-1]}</code>'
+                return f"<code>{p.rsplit('/', 1)[-1]}</code>"
     if "claude" in cmdline.lower():
         return "Claude Code session"
     if "run-daemon" in cmdline or "run-server" in cmdline:
         for p in parts:
             if "run-daemon" in p or "run-server" in p:
                 service = p.split("/")[-3] if p.count("/") >= 3 else p.rsplit("/", 1)[-1]
-                return f'Daemon: <code>{service}</code>'
+                return f"Daemon: <code>{service}</code>"
     short = cmdline[:80] + ("..." if len(cmdline) > 80 else "")
     return f'<code style="font-size:11px;color:#475569">{short}</code>'
 
 
 def _is_daemon(cmdline: str) -> bool:
     cl = cmdline.lower()
-    app_signals = ["/Applications/", ".app/Contents/MacOS/", "Electron", "iTerm", "Chrome", "Safari", "Firefox", "Cursor", "Xcode"]
+    app_signals = [
+        "/Applications/",
+        ".app/Contents/MacOS/",
+        "Electron",
+        "iTerm",
+        "Chrome",
+        "Safari",
+        "Firefox",
+        "Cursor",
+        "Xcode",
+    ]
     for sig in app_signals:
         if sig.lower() in cl:
             return False
-    daemon_signals = ["launchd", "daemon", "run-server", "run-daemon", "uvicorn", "gunicorn", "celery", "worker",
-                      "/usr/sbin/", "/usr/libexec/", "com.apple.", "com.reeves.", "com.tosh.", "com.eidos", "-m ", "python3 -"]
+    daemon_signals = [
+        "launchd",
+        "daemon",
+        "run-server",
+        "run-daemon",
+        "uvicorn",
+        "gunicorn",
+        "celery",
+        "worker",
+        "/usr/sbin/",
+        "/usr/libexec/",
+        "com.apple.",
+        "com.reeves.",
+        "com.tosh.",
+        "com.eidos",
+        "-m ",
+        "python3 -",
+    ]
     for sig in daemon_signals:
         if sig in cl:
             return True
@@ -250,7 +307,9 @@ def _get_live_process_tables() -> tuple[list[dict], list[dict]]:
     except (subprocess.TimeoutExpired, OSError):
         pass
     try:
-        out = subprocess.run(["ps", "-eo", "pid,pcpu,pmem,comm", "-r"], capture_output=True, text=True, timeout=5)
+        out = subprocess.run(
+            ["ps", "-eo", "pid,pcpu,pmem,comm", "-r"], capture_output=True, text=True, timeout=5
+        )
         if out.returncode == 0:
             for line in out.stdout.strip().split("\n")[1:15]:
                 parts = line.split(None, 3)
@@ -259,8 +318,18 @@ def _get_live_process_tables() -> tuple[list[dict], list[dict]]:
                 pid, cpu, mem, comm = parts
                 if float(cpu) < 5:
                     break
-                cpu_hogs.append({"pid": pid, "cpu": cpu, "mem": mem, "name": comm.rsplit("/", 1)[-1], "cmdline": cmdlines.get(pid, "")})
-        out = subprocess.run(["ps", "-eo", "pid,pcpu,pmem,comm", "-m"], capture_output=True, text=True, timeout=5)
+                cpu_hogs.append(
+                    {
+                        "pid": pid,
+                        "cpu": cpu,
+                        "mem": mem,
+                        "name": comm.rsplit("/", 1)[-1],
+                        "cmdline": cmdlines.get(pid, ""),
+                    }
+                )
+        out = subprocess.run(
+            ["ps", "-eo", "pid,pcpu,pmem,comm", "-m"], capture_output=True, text=True, timeout=5
+        )
         if out.returncode == 0:
             for line in out.stdout.strip().split("\n")[1:15]:
                 parts = line.split(None, 3)
@@ -269,23 +338,41 @@ def _get_live_process_tables() -> tuple[list[dict], list[dict]]:
                 pid, cpu, mem, comm = parts
                 if float(mem) < 1.0:
                     break
-                mem_hogs.append({"pid": pid, "cpu": cpu, "mem": mem, "name": comm.rsplit("/", 1)[-1], "cmdline": cmdlines.get(pid, "")})
+                mem_hogs.append(
+                    {
+                        "pid": pid,
+                        "cpu": cpu,
+                        "mem": mem,
+                        "name": comm.rsplit("/", 1)[-1],
+                        "cmdline": cmdlines.get(pid, ""),
+                    }
+                )
     except (subprocess.TimeoutExpired, OSError):
         pass
     return cpu_hogs, mem_hogs
 
 
 _TRADEOFF_MAP = {
-    "swap": {"gain": "Faster app switching, no more random freezes, reduced SSD wear",
-             "lose": "Need to close some apps or reboot — temporary disruption"},
-    "disk": {"gain": "Faster writes, swap can grow when needed, macOS updates work again",
-             "lose": "Time spent cleaning up files"},
-    "orphaned": {"gain": "Fewer wasted process spawns, cleaner launchd, less log noise",
-                 "lose": "Nothing — these agents serve no purpose, their app is already gone"},
-    "outdated": {"gain": "Security patches, bug fixes, compatibility with newer tools",
-                 "lose": "Possible breaking changes — review changelogs before upgrading all at once"},
-    "crash-loop": {"gain": "CPU freed from restart cycles, fewer kernel panic triggers",
-                   "lose": "The service stops running — check if anything depends on it first"},
+    "swap": {
+        "gain": "Faster app switching, no more random freezes, reduced SSD wear",
+        "lose": "Need to close some apps or reboot — temporary disruption",
+    },
+    "disk": {
+        "gain": "Faster writes, swap can grow when needed, macOS updates work again",
+        "lose": "Time spent cleaning up files",
+    },
+    "orphaned": {
+        "gain": "Fewer wasted process spawns, cleaner launchd, less log noise",
+        "lose": "Nothing — these agents serve no purpose, their app is already gone",
+    },
+    "outdated": {
+        "gain": "Security patches, bug fixes, compatibility with newer tools",
+        "lose": "Possible breaking changes — review changelogs before upgrading all at once",
+    },
+    "crash-loop": {
+        "gain": "CPU freed from restart cycles, fewer kernel panic triggers",
+        "lose": "The service stops running — check if anything depends on it first",
+    },
 }
 
 
@@ -307,9 +394,12 @@ def _get_tradeoff_fn(finding: dict) -> dict | None:
 
 # ── Uptime ──
 
+
 def _get_uptime() -> str:
     try:
-        out = subprocess.run(["sysctl", "-n", "kern.boottime"], capture_output=True, text=True, timeout=5)
+        out = subprocess.run(
+            ["sysctl", "-n", "kern.boottime"], capture_output=True, text=True, timeout=5
+        )
         boot_sec = int(out.stdout.split("sec = ")[1].split(",")[0])
         uptime_sec = int(datetime.now().timestamp()) - boot_sec
         days = uptime_sec // 86400
@@ -320,6 +410,7 @@ def _get_uptime() -> str:
 
 
 # ── BLUF ──
+
 
 def _generate_bluf(criticals, warnings, infos, spikes) -> str:
     if not criticals and not warnings:
@@ -356,14 +447,30 @@ def _generate_bluf(criticals, warnings, infos, spikes) -> str:
 
 # ── Score matrix ──
 
+
 def _compute_matrix(report) -> dict:
     dim_checks = {
         "stability": ["Crash Loops", "Kernel Panics", "Shutdown Causes"],
-        "cpu": ["CPU Load"], "thermal": ["Thermal"], "memory": ["Memory Pressure"],
-        "storage": ["Disk Health"], "services": ["Launch Agents"],
-        "security": ["Security"], "infra": ["Dynamic Library Health", "Homebrew"], "network": ["Network"],
+        "cpu": ["CPU Load"],
+        "thermal": ["Thermal"],
+        "memory": ["Memory Pressure"],
+        "storage": ["Disk Health"],
+        "services": ["Launch Agents"],
+        "security": ["Security"],
+        "infra": ["Dynamic Library Health", "Homebrew"],
+        "network": ["Network"],
     }
-    weights = {"stability": 3, "cpu": 3, "memory": 2, "thermal": 2, "storage": 2, "services": 2, "security": 1, "infra": 1, "network": 1}
+    weights = {
+        "stability": 3,
+        "cpu": 3,
+        "memory": 2,
+        "thermal": 2,
+        "storage": 2,
+        "services": 2,
+        "security": 1,
+        "infra": 1,
+        "network": 1,
+    }
     check_scores = {}
     for r in report.results:
         score = 100
@@ -382,17 +489,40 @@ def _compute_matrix(report) -> dict:
         matrix[dim] = min(scores) if scores else 100
     weighted_sum = sum(matrix.get(d, 100) * w for d, w in weights.items())
     overall = round(weighted_sum / sum(weights.values()))
-    grade = "A" if overall >= 90 else "B" if overall >= 75 else "C" if overall >= 50 else "D" if overall >= 25 else "F"
+    grade = (
+        "A"
+        if overall >= 90
+        else "B"
+        if overall >= 75
+        else "C"
+        if overall >= 50
+        else "D"
+        if overall >= 25
+        else "F"
+    )
     return {**matrix, "_overall": overall, "_grade": grade}
 
 
 # ── Action plan ──
 
-def _build_action_plan(criticals, warnings, spikes, offenders, stale_apps, redundant_apps, matrix=None) -> dict:
+
+def _build_action_plan(
+    criticals, warnings, spikes, offenders, stale_apps, redundant_apps, matrix=None
+) -> dict:
     # Score gain estimation: fixing a dimension from 0→100 or 50→100
     # weighted by dimension weight, divided by total weight (17)
     def _est_gain(dim: str, current: int, target: int = 100) -> int:
-        weights = {"stability": 3, "cpu": 3, "memory": 2, "thermal": 2, "storage": 2, "services": 2, "security": 1, "infra": 1, "network": 1}
+        weights = {
+            "stability": 3,
+            "cpu": 3,
+            "memory": 2,
+            "thermal": 2,
+            "storage": 2,
+            "services": 2,
+            "security": 1,
+            "infra": 1,
+            "network": 1,
+        }
         w = weights.get(dim, 1)
         return round((target - current) * w / 17)
 
@@ -401,39 +531,133 @@ def _build_action_plan(criticals, warnings, spikes, offenders, stale_apps, redun
     immediate, longterm = [], []
     for item in criticals:
         if "crash-looping" in item["summary"].lower() or "crash loop" in item["summary"].lower():
-            immediate.append({"action": f"Stop crash loop: {item['summary'][:50]}", "impact": "Frees CPU from restart cycles", "effort": "1 min", "cmd": item.get("fix", ""), "score_gain": _est_gain("services", m.get("services", 0))})
+            immediate.append(
+                {
+                    "action": f"Stop crash loop: {item['summary'][:50]}",
+                    "impact": "Frees CPU from restart cycles",
+                    "effort": "1 min",
+                    "cmd": item.get("fix", ""),
+                    "score_gain": _est_gain("services", m.get("services", 0)),
+                }
+            )
     if spikes and any(s.get("ongoing") for s in spikes):
         s = next(s for s in spikes if s.get("ongoing"))
         procs = ", ".join(p[1] for p in s.get("top_processes", [])[:3])
-        immediate.append({"action": f"Active load spike (peak {s['peak_load']:.0f}x)", "impact": f"Culprits: {procs}", "effort": "5 min", "cmd": "", "score_gain": _est_gain("cpu", m.get("cpu", 0))})
+        immediate.append(
+            {
+                "action": f"Active load spike (peak {s['peak_load']:.0f}x)",
+                "impact": f"Culprits: {procs}",
+                "effort": "5 min",
+                "cmd": "",
+                "score_gain": _est_gain("cpu", m.get("cpu", 0)),
+            }
+        )
     sustained = [o for o in offenders if o.get("sustained")]
     for o in sustained[:2]:
-        immediate.append({"action": f"Investigate {o['name']} — {o['avg_cpu']}% avg CPU", "impact": f"Sustained strain: {o['total_cpu']:.0f} cumulative CPU-seconds", "effort": "10 min", "cmd": "", "score_gain": 0})
+        immediate.append(
+            {
+                "action": f"Investigate {o['name']} — {o['avg_cpu']}% avg CPU",
+                "impact": f"Sustained strain: {o['total_cpu']:.0f} cumulative CPU-seconds",
+                "effort": "10 min",
+                "cmd": "",
+                "score_gain": 0,
+            }
+        )
     panics = [c for c in criticals if c["check"] == "Kernel Panics"]
     if len(panics) >= 5:
-        immediate.append({"action": f"Resolve kernel panic pattern ({len(panics)} panics)", "impact": "Mac will keep crashing until fixed", "effort": "30 min", "cmd": "aad checkup -c kernel_panics -c cpu_load --json", "score_gain": _est_gain("stability", m.get("stability", 0))})
+        immediate.append(
+            {
+                "action": f"Resolve kernel panic pattern ({len(panics)} panics)",
+                "impact": "Mac will keep crashing until fixed",
+                "effort": "30 min",
+                "cmd": "aad checkup -c kernel_panics -c cpu_load --json",
+                "score_gain": _est_gain("stability", m.get("stability", 0)),
+            }
+        )
     if any("swap" in w["summary"].lower() for w in warnings):
-        immediate.append({"action": "Reduce memory pressure", "impact": "Mac is using SSD as RAM, slowing everything", "effort": "5 min", "cmd": "See Memory Hogs table", "score_gain": _est_gain("memory", m.get("memory", 0), 100)})
+        immediate.append(
+            {
+                "action": "Reduce memory pressure",
+                "impact": "Mac is using SSD as RAM, slowing everything",
+                "effort": "5 min",
+                "cmd": "See Memory Hogs table",
+                "score_gain": _est_gain("memory", m.get("memory", 0), 100),
+            }
+        )
     orphans = [w for w in warnings if "orphaned" in w["summary"].lower()]
     if orphans:
-        longterm.append({"action": "Remove orphaned launch agents", "impact": "Eliminates wasted process spawns", "effort": "5 min", "cmd": orphans[0].get("fix", ""), "score_gain": 2})
+        longterm.append(
+            {
+                "action": "Remove orphaned launch agents",
+                "impact": "Eliminates wasted process spawns",
+                "effort": "5 min",
+                "cmd": orphans[0].get("fix", ""),
+                "score_gain": 2,
+            }
+        )
     if redundant_apps:
         names = [r["unused"]["name"] for r in redundant_apps[:3]]
-        longterm.append({"action": f"Uninstall {len(redundant_apps)} replaced app(s): {', '.join(names)}", "impact": "Reclaim disk, reduce background processes", "effort": "10 min", "cmd": "", "score_gain": _est_gain("storage", m.get("storage", 50), 100)})
+        longterm.append(
+            {
+                "action": f"Uninstall {len(redundant_apps)} replaced app(s): {', '.join(names)}",
+                "impact": "Reclaim disk, reduce background processes",
+                "effort": "10 min",
+                "cmd": "",
+                "score_gain": _est_gain("storage", m.get("storage", 50), 100),
+            }
+        )
     elif stale_apps:
-        longterm.append({"action": f"Review {len(stale_apps)} unused apps", "impact": "Reclaim disk space", "effort": "15 min", "cmd": "", "score_gain": _est_gain("storage", m.get("storage", 50), 100)})
-    if any("disk" in w["check"].lower() and ("full" in w["summary"].lower() or "free" in w["summary"].lower()) for w in warnings):
-        longterm.append({"action": "Free disk space", "impact": "Prevents swap failures, enables updates", "effort": "20 min", "cmd": "sudo tmutil thinlocalsnapshots / 9999999999 1", "score_gain": _est_gain("storage", m.get("storage", 0))})
+        longterm.append(
+            {
+                "action": f"Review {len(stale_apps)} unused apps",
+                "impact": "Reclaim disk space",
+                "effort": "15 min",
+                "cmd": "",
+                "score_gain": _est_gain("storage", m.get("storage", 50), 100),
+            }
+        )
+    if any(
+        "disk" in w["check"].lower()
+        and ("full" in w["summary"].lower() or "free" in w["summary"].lower())
+        for w in warnings
+    ):
+        longterm.append(
+            {
+                "action": "Free disk space",
+                "impact": "Prevents swap failures, enables updates",
+                "effort": "20 min",
+                "cmd": "sudo tmutil thinlocalsnapshots / 9999999999 1",
+                "score_gain": _est_gain("storage", m.get("storage", 0)),
+            }
+        )
     brew = [w for w in warnings if w["check"] == "Homebrew"]
     if len(brew) >= 3:
-        longterm.append({"action": "Homebrew maintenance", "impact": "Security patches, reclaim cache space", "effort": "15 min", "cmd": "brew upgrade && brew cleanup", "score_gain": _est_gain("infra", m.get("infra", 0))})
+        longterm.append(
+            {
+                "action": "Homebrew maintenance",
+                "impact": "Security patches, reclaim cache space",
+                "effort": "15 min",
+                "cmd": "brew upgrade && brew cleanup",
+                "score_gain": _est_gain("infra", m.get("infra", 0)),
+            }
+        )
     from .launchd import _plist_path
+
     if not _plist_path().exists():
-        longterm.append({"action": "Install vitals monitor", "impact": "Better sustained pressure data in future reports", "effort": "1 min", "cmd": "aad install", "score_gain": 0})
+        longterm.append(
+            {
+                "action": "Install vitals monitor",
+                "impact": "Better sustained pressure data in future reports",
+                "effort": "1 min",
+                "cmd": "aad install",
+                "score_gain": 0,
+            }
+        )
     return {"immediate": immediate[:5], "longterm": longterm[:5]}
 
 
 # ── Scatterplot ──
+
 
 def _cleanup_scatterplot(stale_apps: list[dict], width: int = 780, height: int = 320) -> str:
     if not stale_apps:
@@ -452,7 +676,9 @@ def _cleanup_scatterplot(stale_apps: list[dict], width: int = 780, height: int =
     svg += f'<line x1="{mid_x}" y1="{pad_t}" x2="{mid_x}" y2="{pad_t + plot_h}" stroke="#e2e8f0" stroke-dasharray="4"/>\n'
     svg += f'<line x1="{pad_l}" y1="{mid_y}" x2="{pad_l + plot_w}" y2="{mid_y}" stroke="#e2e8f0" stroke-dasharray="4"/>\n'
     svg += f'<line x1="{pad_l}" y1="{pad_t + plot_h}" x2="{pad_l + plot_w}" y2="{pad_t + plot_h}" stroke="#94a3b8"/>\n'
-    svg += f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t + plot_h}" stroke="#94a3b8"/>\n'
+    svg += (
+        f'<line x1="{pad_l}" y1="{pad_t}" x2="{pad_l}" y2="{pad_t + plot_h}" stroke="#94a3b8"/>\n'
+    )
     svg += f'<text x="{pad_l + plot_w // 2}" y="{height - 4}" text-anchor="middle" font-size="12" fill="#64748b">Days since last use →</text>\n'
     svg += f'<text x="14" y="{pad_t + plot_h // 2}" text-anchor="middle" font-size="12" fill="#64748b" transform="rotate(-90 14 {pad_t + plot_h // 2})">Size (MB) →</text>\n'
     for app in stale_apps:
@@ -466,11 +692,12 @@ def _cleanup_scatterplot(stale_apps: list[dict], width: int = 780, height: int =
         svg += f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{r:.0f}" fill="{color}" opacity="0.7"><title>{app["name"]}</title></circle>\n'
         if size > max_size * 0.15 or in_remove:
             svg += f'<text x="{x + r + 3:.0f}" y="{y + 4:.0f}" font-size="10" fill="#475569">{app["name"][:20]}</text>\n'
-    svg += '</svg>'
+    svg += "</svg>"
     return svg
 
 
 # ── Main entry points ──
+
 
 def generate_html_report(vitals_minutes: int = 60) -> str:
     """Collect all data and render via Jinja2 templates."""
@@ -487,7 +714,13 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     criticals, warnings, infos = [], [], []
     for r in report.results:
         for f in r.findings:
-            entry = {"check": r.name, "summary": f.summary, "fix": f.fix, "details": f.details, "severity": f.severity.value}
+            entry = {
+                "check": r.name,
+                "summary": f.summary,
+                "fix": f.fix,
+                "details": f.details,
+                "severity": f.severity.value,
+            }
             if f.severity.value == "critical":
                 criticals.append(entry)
             elif f.severity.value == "warning":
@@ -499,7 +732,13 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     matrix = _compute_matrix(report)
     overall = matrix.pop("_overall", 0)
     grade = matrix.pop("_grade", "?")
-    grade_color = {"A": "#22c55e", "B": "#22c55e", "C": "#ca8a04", "D": "#ef4444", "F": "#ef4444"}.get(grade, "#94a3b8")
+    grade_color = {
+        "A": "#22c55e",
+        "B": "#22c55e",
+        "C": "#ca8a04",
+        "D": "#ef4444",
+        "F": "#ef4444",
+    }.get(grade, "#94a3b8")
 
     # Vitals
     spikes = vitals_data.get("load", {}).get("spikes", [])
@@ -514,7 +753,9 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     swap_mb = vitals_data.get("swap", {}).get("current_mb") or 0
     if not swap_mb:
         try:
-            out = subprocess.run(["sysctl", "vm.swapusage"], capture_output=True, text=True, timeout=5)
+            out = subprocess.run(
+                ["sysctl", "vm.swapusage"], capture_output=True, text=True, timeout=5
+            )
             if out.returncode == 0 and "used" in out.stdout:
                 swap_mb = float(out.stdout.split("used = ")[1].split(" ")[0].rstrip("M"))
         except Exception:
@@ -522,7 +763,9 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     swap_gb = round(swap_mb / 1024, 1)
     swap_pct = int(swap_gb / ram_gb * 100) if ram_gb else 0
     swap_color = "#ef4444" if swap_pct > 50 else "#ca8a04" if swap_pct > 25 else "#22c55e"
-    current_load = samples[-1]["load"][0] if samples and "load" in samples[-1] else os.getloadavg()[0]
+    current_load = (
+        samples[-1]["load"][0] if samples and "load" in samples[-1] else os.getloadavg()[0]
+    )
     load_pct = int(current_load / cores * 100) if cores else 0
     load_color = "#ef4444" if load_pct > 200 else "#ca8a04" if load_pct > 100 else "#22c55e"
 
@@ -568,22 +811,39 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     criticals_by_check_sorted = sorted(criticals_by_check.items(), key=lambda x: -len(x[1]))
 
     # Matrix dimensions
-    dim_check_map = {"stability": ["Crash Loops", "Kernel Panics", "Shutdown Causes"],
-                     "cpu": ["CPU Load"], "thermal": ["Thermal"], "memory": ["Memory Pressure"],
-                     "storage": ["Disk Health"], "services": ["Launch Agents"],
-                     "security": ["Security"], "infra": ["Dynamic Library Health", "Homebrew"], "network": ["Network"]}
+    dim_check_map = {
+        "stability": ["Crash Loops", "Kernel Panics", "Shutdown Causes"],
+        "cpu": ["CPU Load"],
+        "thermal": ["Thermal"],
+        "memory": ["Memory Pressure"],
+        "storage": ["Disk Health"],
+        "services": ["Launch Agents"],
+        "security": ["Security"],
+        "infra": ["Dynamic Library Health", "Homebrew"],
+        "network": ["Network"],
+    }
     all_findings = criticals + warnings
     dimensions = []
-    for dim, label in [("stability", "Stability"), ("cpu", "CPU"), ("thermal", "Thermal"),
-                       ("memory", "Memory"), ("storage", "Storage"), ("services", "Services"),
-                       ("security", "Security"), ("infra", "Infra"), ("network", "Network")]:
+    for dim, label in [
+        ("stability", "Stability"),
+        ("cpu", "CPU"),
+        ("thermal", "Thermal"),
+        ("memory", "Memory"),
+        ("storage", "Storage"),
+        ("services", "Services"),
+        ("security", "Security"),
+        ("infra", "Infra"),
+        ("network", "Network"),
+    ]:
         val = matrix.get(dim, 100)
         issue = ""
         for item in all_findings:
             if item["check"] in dim_check_map.get(dim, []):
                 issue = item["summary"]
                 break
-        dimensions.append({"dim": dim, "label": label, "value": val, "bar_svg": _bar_svg(val), "issue": issue})
+        dimensions.append(
+            {"dim": dim, "label": label, "value": val, "bar_svg": _bar_svg(val), "issue": issue}
+        )
 
     # Cleanup
     stale_apps = _find_stale_apps()
@@ -592,6 +852,7 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     # Similar apps (ensemble ranking)
     from .ensemble_similarity import ensemble_score as _ensemble_score
     from .app_similarity import get_app_metadata as _get_meta
+
     _sim_apps = {}
     for app_path in _glob.glob("/Applications/*.app"):
         name = os.path.basename(app_path).replace(".app", "")
@@ -604,13 +865,17 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     similar_pairs = []
     _sim_names = list(_sim_apps.keys())
     for i, name_a in enumerate(_sim_names):
-        for name_b in _sim_names[i + 1:]:
+        for name_b in _sim_names[i + 1 :]:
             score, reasons = _ensemble_score(_sim_apps[name_a], _sim_apps[name_b])
             if score > 0.3 and reasons:
-                similar_pairs.append({
-                    "app_a": name_a, "app_b": name_b,
-                    "score": score, "reasons": ". ".join(reasons),
-                })
+                similar_pairs.append(
+                    {
+                        "app_a": name_a,
+                        "app_b": name_b,
+                        "score": score,
+                        "reasons": ". ".join(reasons),
+                    }
+                )
     similar_pairs.sort(key=lambda x: x["score"], reverse=True)
     similar_pairs = similar_pairs[:10]
 
@@ -632,40 +897,65 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
     redundant = find_redundant_apps(all_apps_for_sim)
 
     # Action plan
-    action_plan = _build_action_plan(criticals, warnings, spikes, offenders, stale_apps, redundant, matrix)
+    action_plan = _build_action_plan(
+        criticals, warnings, spikes, offenders, stale_apps, redundant, matrix
+    )
 
     # Trend
     trend = None
     if len(history) >= 3:
         recent_c = sum(e.get("counts", {}).get("critical", 0) for e in history[-3:]) / 3
         older_c = sum(e.get("counts", {}).get("critical", 0) for e in history[:3]) / 3
-        trend = "improving" if recent_c < older_c else "degrading" if recent_c > older_c else "stable"
+        trend = (
+            "improving" if recent_c < older_c else "degrading" if recent_c > older_c else "stable"
+        )
 
     # Render
     env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)), autoescape=False)
-    env.globals.update({
-        "sev_badge": _sev_badge, "knowledge_card": _knowledge_card,
-        "match_topics": match_topics, "get_tradeoff": _get_tradeoff_fn,
-        "process_action": _process_action, "mini_sparkline": _mini_sparkline,
-        "cpu_bar": _cpu_bar, "mem_bar": _mem_bar, "mem_gb": _mem_gb,
-        "bar_html": _bar_html, "size_bar": _size_bar,
-    })
+    env.globals.update(
+        {
+            "sev_badge": _sev_badge,
+            "knowledge_card": _knowledge_card,
+            "match_topics": match_topics,
+            "get_tradeoff": _get_tradeoff_fn,
+            "process_action": _process_action,
+            "mini_sparkline": _mini_sparkline,
+            "cpu_bar": _cpu_bar,
+            "mem_bar": _mem_bar,
+            "mem_gb": _mem_gb,
+            "bar_html": _bar_html,
+            "size_bar": _size_bar,
+        }
+    )
 
     template = env.get_template("report.html")
     return template.render(
-        grade=grade, overall=overall, grade_color=grade_color,
+        grade=grade,
+        overall=overall,
+        grade_color=grade_color,
         now_str=datetime.now().strftime("%Y-%m-%d %H:%M"),
         duration_ms=report.duration_ms,
-        mac=info, cores=cores, ram_gb=ram_gb,
+        mac=info,
+        cores=cores,
+        ram_gb=ram_gb,
         donut_svg=_donut_svg(overall, grade, grade_color),
         bluf_text=_generate_bluf(criticals, warnings, infos, spikes),
-        criticals=criticals, warnings=warnings, infos=infos,
+        criticals=criticals,
+        warnings=warnings,
+        infos=infos,
         criticals_by_check=criticals_by_check_sorted,
         dimensions=dimensions,
         # Sysinfo
-        current_load=current_load, load_pct=load_pct, load_color=load_color,
-        swap_gb=swap_gb, swap_pct=swap_pct, swap_color=swap_color,
-        disk_used_gb=disk_used_gb, disk_total_gb=disk_total_gb, disk_pct=disk_pct, disk_color=disk_color,
+        current_load=current_load,
+        load_pct=load_pct,
+        load_color=load_color,
+        swap_gb=swap_gb,
+        swap_pct=swap_pct,
+        swap_color=swap_color,
+        disk_used_gb=disk_used_gb,
+        disk_total_gb=disk_total_gb,
+        disk_pct=disk_pct,
+        disk_color=disk_color,
         uptime=uptime,
         # Load
         load_values=load_values,
@@ -674,42 +964,80 @@ def generate_html_report(vitals_minutes: int = 60) -> str:
         sparkline_svg=_sparkline_svg(load_values, width=780, height=70) if load_values else "",
         spikes=spikes,
         # Pressure
-        sustained=sustained, transient=transient,
+        sustained=sustained,
+        transient=transient,
         max_sustained_cpu=max(o["total_cpu"] for o in sustained) if sustained else 1,
         max_transient_peak=max(o["peak_cpu"] for o in transient[:5]) if transient else 1,
         # Hogs
-        daemon_hogs=daemon_hogs, app_cpu_hogs=app_cpu_hogs, mem_hogs=mem_hogs,
+        daemon_hogs=daemon_hogs,
+        app_cpu_hogs=app_cpu_hogs,
+        mem_hogs=mem_hogs,
         max_daemon_cpu=max(float(p["cpu"]) for p in daemon_hogs) if daemon_hogs else 1,
         max_app_cpu=max(float(p["cpu"]) for p in app_cpu_hogs) if app_cpu_hogs else 1,
         max_mem_pct=max(float(p["mem"]) for p in mem_hogs) if mem_hogs else 1,
         # Cleanup
-        stale_apps=stale_apps, remove_candidates=remove_candidates,
+        stale_apps=stale_apps,
+        remove_candidates=remove_candidates,
         scatterplot_svg=_cleanup_scatterplot(stale_apps),
-        max_remove_size=max(a.get("size_mb", 1) for a in remove_candidates) if remove_candidates else 1,
+        max_remove_size=max(a.get("size_mb", 1) for a in remove_candidates)
+        if remove_candidates
+        else 1,
         # Similarity
         similar_pairs=similar_pairs,
         redundant=redundant,
         # Actions
-        immediate=action_plan["immediate"], longterm=action_plan["longterm"],
+        immediate=action_plan["immediate"],
+        longterm=action_plan["longterm"],
         # Trend
         trend=trend,
         # JSON download
         report_json=_build_report_json(
-            grade, overall, matrix, criticals, warnings, infos,
-            action_plan, trend, info, cores, ram_gb, uptime,
+            grade,
+            overall,
+            matrix,
+            criticals,
+            warnings,
+            infos,
+            action_plan,
+            trend,
+            info,
+            cores,
+            ram_gb,
+            uptime,
         ),
     )
 
 
-def _build_report_json(grade, overall, matrix, criticals, warnings, infos,
-                       action_plan, trend, mac_info, cores, ram_gb, uptime) -> str:
+def _build_report_json(
+    grade,
+    overall,
+    matrix,
+    criticals,
+    warnings,
+    infos,
+    action_plan,
+    trend,
+    mac_info,
+    cores,
+    ram_gb,
+    uptime,
+) -> str:
     """Build JSON blob for the download button."""
     import json
+
     data = {
-        "grade": grade, "score": overall, "matrix": matrix,
-        "mac": mac_info, "cores": cores, "ram_gb": ram_gb, "uptime": uptime,
-        "criticals": criticals, "warnings": warnings, "infos": infos,
-        "actions": action_plan, "trend": trend,
+        "grade": grade,
+        "score": overall,
+        "matrix": matrix,
+        "mac": mac_info,
+        "cores": cores,
+        "ram_gb": ram_gb,
+        "uptime": uptime,
+        "criticals": criticals,
+        "warnings": warnings,
+        "infos": infos,
+        "actions": action_plan,
+        "trend": trend,
         "generated": datetime.now().isoformat(timespec="seconds"),
     }
     return json.dumps(data)

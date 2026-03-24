@@ -23,14 +23,18 @@ def check_launch_agents() -> CheckResult:
     try:
         out = subprocess.run(
             ["launchctl", "list"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
     except (subprocess.TimeoutExpired, OSError):
-        result.findings.append(Finding(
-            check="launch_agents",
-            severity=Severity.INFO,
-            summary="Could not query launchctl",
-        ))
+        result.findings.append(
+            Finding(
+                check="launch_agents",
+                severity=Severity.INFO,
+                summary="Could not query launchctl",
+            )
+        )
         return result
 
     # Parse launchctl output: PID Status Label
@@ -68,29 +72,36 @@ def check_launch_agents() -> CheckResult:
     for label, plist_file in keepalive_services:
         if label in crashed_labels:
             status = next(s for lbl, s in crashed_services if lbl == label)
-            result.findings.append(Finding(
-                check="launch_agents",
-                severity=Severity.CRITICAL,
-                summary=f"{label}: crash-looping (KeepAlive + exit code {status})",
-                details=f"Plist: {plist_file}",
-                fix=crash_loop_fix(label, str(plist_file), ctx),
-            ))
+            result.findings.append(
+                Finding(
+                    check="launch_agents",
+                    severity=Severity.CRITICAL,
+                    summary=f"{label}: crash-looping (KeepAlive + exit code {status})",
+                    details=f"Plist: {plist_file}",
+                    fix=crash_loop_fix(label, str(plist_file), ctx),
+                )
+            )
 
     # Report other crashed services (non-KeepAlive, less severe)
     keepalive_labels = {label for label, _ in keepalive_services}
     for label, status in crashed_services[:10]:  # cap output
         if label not in keepalive_labels:
-            result.findings.append(Finding(
-                check="launch_agents",
-                severity=Severity.INFO,
-                summary=f"{label}: exited with status {status}",
-            ))
+            result.findings.append(
+                Finding(
+                    check="launch_agents",
+                    severity=Severity.INFO,
+                    summary=f"{label}: exited with status {status}",
+                )
+            )
 
     if not any(f.severity in (Severity.CRITICAL, Severity.WARNING) for f in result.findings):
-        result.findings.insert(0, Finding(
-            check="launch_agents",
-            severity=Severity.OK,
-            summary="No crash-looping launch agents detected",
-        ))
+        result.findings.insert(
+            0,
+            Finding(
+                check="launch_agents",
+                severity=Severity.OK,
+                summary="No crash-looping launch agents detected",
+            ),
+        )
 
     return result

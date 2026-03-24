@@ -14,11 +14,13 @@ def check_dylib_health() -> CheckResult:
     if not cellar.exists():
         cellar = Path("/usr/local/Cellar")
     if not cellar.exists():
-        result.findings.append(Finding(
-            check="dylib_health",
-            severity=Severity.OK,
-            summary="No Homebrew Cellar found — skipping dylib check",
-        ))
+        result.findings.append(
+            Finding(
+                check="dylib_health",
+                severity=Severity.OK,
+                summary="No Homebrew Cellar found — skipping dylib check",
+            )
+        )
         return result
 
     # Check binaries in Homebrew-linked services
@@ -37,7 +39,9 @@ def check_dylib_health() -> CheckResult:
             try:
                 out = subprocess.run(
                     ["otool", "-L", str(real)],
-                    capture_output=True, text=True, timeout=5,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
                 )
                 checked += 1
                 for line in out.stdout.strip().split("\n")[1:]:
@@ -50,19 +54,23 @@ def check_dylib_health() -> CheckResult:
 
     for binary_name, missing_lib in broken:
         lib_name = Path(missing_lib).name
-        result.findings.append(Finding(
-            check="dylib_health",
-            severity=Severity.CRITICAL,
-            summary=f"{binary_name}: missing {lib_name}",
-            details=f"Expected at: {missing_lib}",
-            fix=f"brew reinstall {binary_name}",
-        ))
+        result.findings.append(
+            Finding(
+                check="dylib_health",
+                severity=Severity.CRITICAL,
+                summary=f"{binary_name}: missing {lib_name}",
+                details=f"Expected at: {missing_lib}",
+                fix=f"brew reinstall {binary_name}",
+            )
+        )
 
     if not broken:
-        result.findings.append(Finding(
-            check="dylib_health",
-            severity=Severity.OK,
-            summary=f"All {checked} checked binaries have intact dylib links",
-        ))
+        result.findings.append(
+            Finding(
+                check="dylib_health",
+                severity=Severity.OK,
+                summary=f"All {checked} checked binaries have intact dylib links",
+            )
+        )
 
     return result

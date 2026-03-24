@@ -23,9 +23,21 @@ _RUNTIME_MARKERS = {
 
 # Frameworks too common to be useful for similarity (everyone links these)
 _GENERIC_FRAMEWORKS = {
-    "AppKit", "Foundation", "CoreFoundation", "Security", "SystemConfiguration",
-    "CoreServices", "CoreGraphics", "IOKit", "CFNetwork", "DiskArbitration",
-    "libobjc", "libSystem", "libz", "libc++", "libsqlite3",
+    "AppKit",
+    "Foundation",
+    "CoreFoundation",
+    "Security",
+    "SystemConfiguration",
+    "CoreServices",
+    "CoreGraphics",
+    "IOKit",
+    "CFNetwork",
+    "DiskArbitration",
+    "libobjc",
+    "libSystem",
+    "libz",
+    "libc++",
+    "libsqlite3",
 }
 
 
@@ -134,7 +146,9 @@ def get_brew_description(app_path: str) -> str:
     try:
         out = subprocess.run(
             ["brew", "info", "--cask", "--json=v2", cask_token],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if out.returncode == 0:
             data = json.loads(out.stdout)

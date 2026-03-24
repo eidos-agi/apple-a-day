@@ -16,7 +16,9 @@ def check_disk_health() -> CheckResult:
     try:
         out = subprocess.run(
             ["diskutil", "info", "/"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         info_lines = {}
         for line in out.stdout.strip().split("\n"):
@@ -44,7 +46,7 @@ def check_disk_health() -> CheckResult:
 
         if disk_bytes and free_bytes:
             used_pct = round((1 - free_bytes / disk_bytes) * 100)
-            free_gb = round(free_bytes / (1000 ** 3), 1)
+            free_gb = round(free_bytes / (1000**3), 1)
 
             if free_gb < 10:
                 sev = Severity.CRITICAL
@@ -59,23 +61,29 @@ def check_disk_health() -> CheckResult:
 
             fix = ""
             if sev != Severity.OK:
-                fix = "Run `sudo tmutil thinlocalsnapshots / 9999999999 1` to reclaim snapshot space."
+                fix = (
+                    "Run `sudo tmutil thinlocalsnapshots / 9999999999 1` to reclaim snapshot space."
+                )
                 extra = disk_context(free_gb, used_pct, ctx)
                 if extra:
                     fix += f" {extra}"
 
             details = ""
             if sev != Severity.OK and ctx.get("is_developer"):
-                details = ("Developers with heavy workloads should keep 50+ GB free "
-                           "to avoid swap pressure and slow builds.")
+                details = (
+                    "Developers with heavy workloads should keep 50+ GB free "
+                    "to avoid swap pressure and slow builds."
+                )
 
-            result.findings.append(Finding(
-                check="disk_health",
-                severity=sev,
-                summary=f"Boot disk {used_pct}% full — {free_gb} GB free",
-                details=details,
-                fix=fix,
-            ))
+            result.findings.append(
+                Finding(
+                    check="disk_health",
+                    severity=sev,
+                    summary=f"Boot disk {used_pct}% full — {free_gb} GB free",
+                    details=details,
+                    fix=fix,
+                )
+            )
     except (subprocess.TimeoutExpired, OSError, ValueError):
         pass
 
@@ -83,7 +91,9 @@ def check_disk_health() -> CheckResult:
     try:
         out = subprocess.run(
             ["diskutil", "apfs", "list", "-plist"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True,
+            text=True,
+            timeout=15,
         )
         plist = plistlib.loads(out.stdout.encode())
         containers = plist.get("Containers", [])
@@ -91,11 +101,13 @@ def check_disk_health() -> CheckResult:
             ref = container.get("ContainerReference", "unknown")
             volumes = container.get("Volumes", [])
             [v.get("Roles", []) for v in volumes]
-            result.findings.append(Finding(
-                check="disk_health",
-                severity=Severity.OK,
-                summary=f"APFS container {ref}: {len(volumes)} volumes",
-            ))
+            result.findings.append(
+                Finding(
+                    check="disk_health",
+                    severity=Severity.OK,
+                    summary=f"APFS container {ref}: {len(volumes)} volumes",
+                )
+            )
     except (subprocess.TimeoutExpired, OSError, plistlib.InvalidFileException):
         pass
 
@@ -103,9 +115,13 @@ def check_disk_health() -> CheckResult:
     try:
         out = subprocess.run(
             ["tmutil", "listlocalsnapshots", "/"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
-        snapshots = [line for line in out.stdout.strip().split("\n") if line.startswith("com.apple")]
+        snapshots = [
+            line for line in out.stdout.strip().split("\n") if line.startswith("com.apple")
+        ]
         count = len(snapshots)
         if count > 20:
             sev = Severity.WARNING
@@ -113,20 +129,26 @@ def check_disk_health() -> CheckResult:
             sev = Severity.OK
 
         if count > 0:
-            result.findings.append(Finding(
-                check="disk_health",
-                severity=sev,
-                summary=f"{count} local Time Machine snapshots",
-                fix="Thin with: `sudo tmutil thinlocalsnapshots / 9999999999 1`" if sev != Severity.OK else "",
-            ))
+            result.findings.append(
+                Finding(
+                    check="disk_health",
+                    severity=sev,
+                    summary=f"{count} local Time Machine snapshots",
+                    fix="Thin with: `sudo tmutil thinlocalsnapshots / 9999999999 1`"
+                    if sev != Severity.OK
+                    else "",
+                )
+            )
     except (subprocess.TimeoutExpired, OSError):
         pass
 
     if not result.findings:
-        result.findings.append(Finding(
-            check="disk_health",
-            severity=Severity.OK,
-            summary="Disk health checks passed",
-        ))
+        result.findings.append(
+            Finding(
+                check="disk_health",
+                severity=Severity.OK,
+                summary="Disk health checks passed",
+            )
+        )
 
     return result

@@ -31,7 +31,9 @@ def get_mac_info() -> dict:
     try:
         out = subprocess.run(
             ["sysctl", "-n", "machdep.cpu.brand_string"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         info["cpu"] = out.stdout.strip()
     except (subprocess.TimeoutExpired, OSError):
@@ -40,10 +42,12 @@ def get_mac_info() -> dict:
     try:
         out = subprocess.run(
             ["sysctl", "-n", "hw.memsize"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         mem_bytes = int(out.stdout.strip())
-        info["memory_gb"] = round(mem_bytes / (1024 ** 3))
+        info["memory_gb"] = round(mem_bytes / (1024**3))
     except (subprocess.TimeoutExpired, OSError, ValueError):
         pass
 
@@ -66,20 +70,26 @@ def run_all_checks(parallel: bool = True) -> CheckupReport:
         except TimeoutError:
             return CheckResult(
                 name=fn.__name__,
-                errors=[CheckError(
-                    check=fn.__name__, error_code=ERR_TIMEOUT,
-                    message="Check timed out",
-                    suggestion="Try running with --no-parallel or check if a subprocess is hanging",
-                )],
+                errors=[
+                    CheckError(
+                        check=fn.__name__,
+                        error_code=ERR_TIMEOUT,
+                        message="Check timed out",
+                        suggestion="Try running with --no-parallel or check if a subprocess is hanging",
+                    )
+                ],
             )
         except Exception as e:
             return CheckResult(
                 name=fn.__name__,
-                errors=[CheckError(
-                    check=fn.__name__, error_code=ERR_UNKNOWN,
-                    message=str(e),
-                    suggestion="Run the check individually to see full output",
-                )],
+                errors=[
+                    CheckError(
+                        check=fn.__name__,
+                        error_code=ERR_UNKNOWN,
+                        message=str(e),
+                        suggestion="Run the check individually to see full output",
+                    )
+                ],
             )
 
     if parallel:
@@ -101,6 +111,7 @@ def run_all_checks(parallel: bool = True) -> CheckupReport:
     # Auto-log every checkup (trigger auto-detected: boot vs scheduled vs manual)
     try:
         from .log import log_checkup
+
         log_checkup(report)
     except Exception:
         pass  # logging should never break the checkup

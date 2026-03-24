@@ -76,7 +76,7 @@ def generate_plist() -> str:
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>{os.environ.get('PATH', '/usr/local/bin:/usr/bin:/bin')}</string>
+        <string>{os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin")}</string>
     </dict>
 </dict>
 </plist>"""
@@ -90,8 +90,9 @@ def install() -> str:
 
     # Load it
     uid = os.getuid()
-    subprocess.run(["launchctl", "bootstrap", f"gui/{uid}", str(plist)],
-                   capture_output=True, timeout=10)
+    subprocess.run(
+        ["launchctl", "bootstrap", f"gui/{uid}", str(plist)], capture_output=True, timeout=10
+    )
 
     return f"Installed: {plist}\nSampling vitals every 60s → ~/.config/eidos/aad-logs/vitals.ndjson"
 
@@ -101,8 +102,9 @@ def uninstall() -> str:
     plist = _plist_path()
     uid = os.getuid()
 
-    subprocess.run(["launchctl", "bootout", f"gui/{uid}", str(plist)],
-                   capture_output=True, timeout=10)
+    subprocess.run(
+        ["launchctl", "bootout", f"gui/{uid}", str(plist)], capture_output=True, timeout=10
+    )
 
     if plist.exists():
         plist.unlink()
@@ -113,8 +115,7 @@ def uninstall() -> str:
 def status() -> str:
     """Check if the monitor daemon is running."""
     try:
-        out = subprocess.run(["launchctl", "list"],
-                             capture_output=True, text=True, timeout=10)
+        out = subprocess.run(["launchctl", "list"], capture_output=True, text=True, timeout=10)
         for line in out.stdout.strip().split("\n"):
             if PLIST_NAME in line:
                 parts = line.split("\t")

@@ -26,15 +26,45 @@ from ..models import CheckResult, Finding, Severity
 # Apps that should never be suggested for removal
 _SAFE_BUNDLE_PREFIXES = ("com.apple.", "com.microsoft.Office", "com.google.Chrome")
 _SAFE_APPS = {
-    "Safari", "Finder", "System Settings", "System Preferences",
-    "App Store", "Terminal", "Console", "Activity Monitor",
-    "Disk Utility", "Migration Assistant", "Boot Camp Assistant",
-    "Font Book", "Keychain Access", "Screenshot", "Preview",
-    "TextEdit", "Calculator", "Music", "Photos", "Maps",
-    "Messages", "FaceTime", "Mail", "Calendar", "Contacts",
-    "Notes", "Reminders", "Freeform", "Shortcuts", "Clock",
-    "Home", "Stocks", "Weather", "News", "Podcasts", "TV",
-    "Books", "Voice Memos", "QuickTime Player",
+    "Safari",
+    "Finder",
+    "System Settings",
+    "System Preferences",
+    "App Store",
+    "Terminal",
+    "Console",
+    "Activity Monitor",
+    "Disk Utility",
+    "Migration Assistant",
+    "Boot Camp Assistant",
+    "Font Book",
+    "Keychain Access",
+    "Screenshot",
+    "Preview",
+    "TextEdit",
+    "Calculator",
+    "Music",
+    "Photos",
+    "Maps",
+    "Messages",
+    "FaceTime",
+    "Mail",
+    "Calendar",
+    "Contacts",
+    "Notes",
+    "Reminders",
+    "Freeform",
+    "Shortcuts",
+    "Clock",
+    "Home",
+    "Stocks",
+    "Weather",
+    "News",
+    "Podcasts",
+    "TV",
+    "Books",
+    "Voice Memos",
+    "QuickTime Player",
 }
 
 
@@ -57,36 +87,42 @@ def check_cleanup() -> CheckResult:
                 f"  {a['name']:35s} last used: {a['last_used'] or 'never':20s} score: {a['score']:.2f}"
                 for a in strong[:8]
             )
-            result.findings.append(Finding(
-                check="cleanup",
-                severity=Severity.INFO,
-                summary=f"{len(strong)} app(s) not used in 90+ days: {', '.join(names[:5])}{'...' if len(names) > 5 else ''}",
-                details=details,
-                fix="Review and uninstall unused apps. Drag to Trash or use `sudo rm -rf /Applications/<App>.app`",
-            ))
+            result.findings.append(
+                Finding(
+                    check="cleanup",
+                    severity=Severity.INFO,
+                    summary=f"{len(strong)} app(s) not used in 90+ days: {', '.join(names[:5])}{'...' if len(names) > 5 else ''}",
+                    details=details,
+                    fix="Review and uninstall unused apps. Drag to Trash or use `sudo rm -rf /Applications/<App>.app`",
+                )
+            )
 
         if moderate:
             names = [a["name"] for a in moderate[:5]]
-            result.findings.append(Finding(
-                check="cleanup",
-                severity=Severity.INFO,
-                summary=f"{len(moderate)} app(s) rarely used: {', '.join(names[:5])}",
-                details="\n".join(
-                    f"  {a['name']:35s} last used: {a['last_used'] or 'never':20s} score: {a['score']:.2f}"
-                    for a in moderate[:5]
-                ),
-            ))
+            result.findings.append(
+                Finding(
+                    check="cleanup",
+                    severity=Severity.INFO,
+                    summary=f"{len(moderate)} app(s) rarely used: {', '.join(names[:5])}",
+                    details="\n".join(
+                        f"  {a['name']:35s} last used: {a['last_used'] or 'never':20s} score: {a['score']:.2f}"
+                        for a in moderate[:5]
+                    ),
+                )
+            )
 
     # --- Orphaned launch agents ---
     if orphaned_agents:
         details = "\n".join(f"  {a['label']:50s} → {a['reason']}" for a in orphaned_agents[:10])
-        result.findings.append(Finding(
-            check="cleanup",
-            severity=Severity.WARNING,
-            summary=f"{len(orphaned_agents)} orphaned launch agent(s) — app removed but agent persists",
-            details=details,
-            fix="Remove orphaned plists: `launchctl bootout gui/$(id -u) <plist_path>` then delete the file",
-        ))
+        result.findings.append(
+            Finding(
+                check="cleanup",
+                severity=Severity.WARNING,
+                summary=f"{len(orphaned_agents)} orphaned launch agent(s) — app removed but agent persists",
+                details=details,
+                fix="Remove orphaned plists: `launchctl bootout gui/$(id -u) <plist_path>` then delete the file",
+            )
+        )
 
     # --- Crash-looping agents (high annoyance, should disable) ---
     if crash_looping:
@@ -94,29 +130,31 @@ def check_cleanup() -> CheckResult:
             f"  {a['label']:50s} exit={a['exit_code']}  restarts={a['restarts']}"
             for a in crash_looping[:5]
         )
-        result.findings.append(Finding(
-            check="cleanup",
-            severity=Severity.WARNING,
-            summary=f"{len(crash_looping)} launch agent(s) stuck in crash loops — wasting CPU",
-            details=details,
-            fix="Disable with: `launchctl bootout gui/$(id -u) <plist_path>` — fix or remove the underlying app",
-        ))
+        result.findings.append(
+            Finding(
+                check="cleanup",
+                severity=Severity.WARNING,
+                summary=f"{len(crash_looping)} launch agent(s) stuck in crash loops — wasting CPU",
+                details=details,
+                fix="Disable with: `launchctl bootout gui/$(id -u) <plist_path>` — fix or remove the underlying app",
+            )
+        )
 
     if not result.findings:
-        result.findings.append(Finding(
-            check="cleanup",
-            severity=Severity.OK,
-            summary="No obvious cleanup candidates found",
-        ))
+        result.findings.append(
+            Finding(
+                check="cleanup",
+                severity=Severity.OK,
+                summary="No obvious cleanup candidates found",
+            )
+        )
 
     return result
 
 
 def _find_stale_apps() -> list[dict]:
     """Find apps not used recently, scored by staleness + resource cost."""
-    apps = glob.glob("/Applications/*.app") + glob.glob(
-        os.path.expanduser("~/Applications/*.app")
-    )
+    apps = glob.glob("/Applications/*.app") + glob.glob(os.path.expanduser("~/Applications/*.app"))
 
     now = datetime.now(timezone.utc)
     scored = []
@@ -147,9 +185,11 @@ def _find_stale_apps() -> list[dict]:
 
         # Get app size
         try:
-            size_bytes = sum(
-                f.stat().st_size for f in Path(app_path).rglob("*") if f.is_file()
-            ) if os.path.isdir(app_path) else 0
+            size_bytes = (
+                sum(f.stat().st_size for f in Path(app_path).rglob("*") if f.is_file())
+                if os.path.isdir(app_path)
+                else 0
+            )
         except (OSError, PermissionError):
             size_bytes = 0
         size_mb = round(size_bytes / (1024 * 1024))
@@ -180,16 +220,18 @@ def _find_stale_apps() -> list[dict]:
         c = a - k + 0.3 * r  # boost stale apps
 
         if c > 0.1:
-            scored.append({
-                "name": name,
-                "path": app_path,
-                "bundle_id": bundle_id,
-                "last_used": f"{days_ago}d ago" if days_ago < 999 else "never",
-                "days_ago": days_ago,
-                "has_agent": has_agent,
-                "size_mb": size_mb,
-                "score": round(c, 3),
-            })
+            scored.append(
+                {
+                    "name": name,
+                    "path": app_path,
+                    "bundle_id": bundle_id,
+                    "last_used": f"{days_ago}d ago" if days_ago < 999 else "never",
+                    "days_ago": days_ago,
+                    "has_agent": has_agent,
+                    "size_mb": size_mb,
+                    "score": round(c, 3),
+                }
+            )
 
     scored.sort(key=lambda x: x["score"], reverse=True)
     return scored
@@ -235,11 +277,13 @@ def _find_orphaned_agents() -> list[dict]:
         for p in all_paths:
             if p.startswith("/") and not os.path.exists(p):
                 binary_missing = True
-                orphaned.append({
-                    "label": label,
-                    "plist": str(plist_path),
-                    "reason": f"binary missing: {p}",
-                })
+                orphaned.append(
+                    {
+                        "label": label,
+                        "plist": str(plist_path),
+                        "reason": f"binary missing: {p}",
+                    }
+                )
                 break
 
         if binary_missing:
@@ -252,19 +296,23 @@ def _find_orphaned_agents() -> list[dict]:
             possible_bundle = ".".join(parts[:3])
             # Only flag if it looks like it belongs to a third-party app
             # and that app is not installed
-            if (not possible_bundle.startswith("com.apple.")
-                    and not possible_bundle.startswith("homebrew.")
-                    and possible_bundle not in installed_bundles):
+            if (
+                not possible_bundle.startswith("com.apple.")
+                and not possible_bundle.startswith("homebrew.")
+                and possible_bundle not in installed_bundles
+            ):
                 # Check if the program path references an uninstalled app
                 for p in all_paths:
                     if "/Applications/" in p:
                         app_ref = p.split("/Applications/")[1].split("/")[0]
                         if not os.path.exists(f"/Applications/{app_ref}"):
-                            orphaned.append({
-                                "label": label,
-                                "plist": str(plist_path),
-                                "reason": f"app uninstalled: {app_ref}",
-                            })
+                            orphaned.append(
+                                {
+                                    "label": label,
+                                    "plist": str(plist_path),
+                                    "reason": f"app uninstalled: {app_ref}",
+                                }
+                            )
                             break
 
     return orphaned
@@ -277,7 +325,9 @@ def _find_crash_looping_agents() -> list[dict]:
     try:
         out = subprocess.run(
             ["launchctl", "list"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
     except (subprocess.TimeoutExpired, OSError):
         return looping
@@ -311,13 +361,17 @@ def _find_crash_looping_agents() -> list[dict]:
                 continue
 
             keep_alive = plist.get("KeepAlive", False)
-            if keep_alive is True or (isinstance(keep_alive, dict) and keep_alive.get("SuccessfulExit") is False):
-                looping.append({
-                    "label": label,
-                    "exit_code": exit_code,
-                    "plist": str(plist_path),
-                    "restarts": "continuous",
-                })
+            if keep_alive is True or (
+                isinstance(keep_alive, dict) and keep_alive.get("SuccessfulExit") is False
+            ):
+                looping.append(
+                    {
+                        "label": label,
+                        "exit_code": exit_code,
+                        "plist": str(plist_path),
+                        "restarts": "continuous",
+                    }
+                )
 
     return looping
 
@@ -327,7 +381,9 @@ def _get_last_used(app_path: str) -> str | None:
     try:
         out = subprocess.run(
             ["mdls", "-name", "kMDItemLastUsedDate", "-raw", app_path],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         val = out.stdout.strip()
         return val if val and val != "(null)" else None
@@ -365,7 +421,9 @@ def _get_process_cpu_map() -> dict[str, float]:
     try:
         out = subprocess.run(
             ["ps", "-eo", "pcpu,comm"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         cpu_map: dict[str, float] = {}
         for line in out.stdout.strip().split("\n")[1:]:

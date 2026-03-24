@@ -76,8 +76,9 @@ def render_report(report, results, severity_order, min_idx):
         lines.append("")
 
     # Summary
-    all_findings = [f for r in results for f in r.findings
-                    if severity_order.index(f.severity.value) >= min_idx]
+    all_findings = [
+        f for r in results for f in r.findings if severity_order.index(f.severity.value) >= min_idx
+    ]
     crits = sum(1 for f in all_findings if f.severity.value == "critical")
     warns = sum(1 for f in all_findings if f.severity.value == "warning")
 

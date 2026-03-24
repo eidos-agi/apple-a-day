@@ -22,11 +22,13 @@ def check_kernel_panics(days: int = 7) -> CheckResult:
     result = CheckResult(name="Kernel Panics")
 
     if not PANIC_DIR.exists():
-        result.findings.append(Finding(
-            check="kernel_panics",
-            severity=Severity.OK,
-            summary="No panic report directory found",
-        ))
+        result.findings.append(
+            Finding(
+                check="kernel_panics",
+                severity=Severity.OK,
+                summary="No panic report directory found",
+            )
+        )
         return result
 
     cutoff = datetime.now().timestamp() - (days * 86400)
@@ -37,11 +39,13 @@ def check_kernel_panics(days: int = 7) -> CheckResult:
     )
 
     if not panic_files:
-        result.findings.append(Finding(
-            check="kernel_panics",
-            severity=Severity.OK,
-            summary=f"No kernel panics in the last {days} days",
-        ))
+        result.findings.append(
+            Finding(
+                check="kernel_panics",
+                severity=Severity.OK,
+                summary=f"No kernel panics in the last {days} days",
+            )
+        )
         return result
 
     for pf in panic_files:
@@ -64,19 +68,23 @@ def check_kernel_panics(days: int = 7) -> CheckResult:
                     explanation = desc
                     break
 
-            result.findings.append(Finding(
-                check="kernel_panics",
-                severity=Severity.CRITICAL,
-                summary=f"Kernel panic on {date}",
-                details=explanation,
-                fix=f"Full report: {pf}",
-            ))
+            result.findings.append(
+                Finding(
+                    check="kernel_panics",
+                    severity=Severity.CRITICAL,
+                    summary=f"Kernel panic on {date}",
+                    details=explanation,
+                    fix=f"Full report: {pf}",
+                )
+            )
         except (json.JSONDecodeError, KeyError):
-            result.findings.append(Finding(
-                check="kernel_panics",
-                severity=Severity.WARNING,
-                summary=f"Unparseable panic report: {pf.name}",
-                fix=f"Manually review: {pf}",
-            ))
+            result.findings.append(
+                Finding(
+                    check="kernel_panics",
+                    severity=Severity.WARNING,
+                    summary=f"Unparseable panic report: {pf.name}",
+                    fix=f"Manually review: {pf}",
+                )
+            )
 
     return result

@@ -23,12 +23,16 @@ def check_cpu_load() -> CheckResult:
         ratio = load_1 / cores
         if ratio > 10:
             sev = Severity.CRITICAL
-            summary = (f"Load average {load_1:.0f} is {ratio:.0f}x your {cores} cores — "
-                       f"machine is severely overloaded")
+            summary = (
+                f"Load average {load_1:.0f} is {ratio:.0f}x your {cores} cores — "
+                f"machine is severely overloaded"
+            )
         elif ratio > 3:
             sev = Severity.WARNING
-            summary = (f"Load average {load_1:.0f} is {ratio:.1f}x your {cores} cores — "
-                       f"system is struggling")
+            summary = (
+                f"Load average {load_1:.0f} is {ratio:.1f}x your {cores} cores — "
+                f"system is struggling"
+            )
         elif ratio > 1.5:
             sev = Severity.INFO
             summary = f"Load average {load_1:.1f} is moderately high ({ratio:.1f}x {cores} cores)"
@@ -45,25 +49,31 @@ def check_cpu_load() -> CheckResult:
             elif load_1 > cores * 5 and load_15 < cores * 2:
                 fix += ". This looks like a recent spike — may resolve on its own"
 
-        result.findings.append(Finding(
-            check="cpu_load",
-            severity=sev,
-            summary=summary,
-            details=f"1m: {load_1:.1f}  5m: {load_5:.1f}  15m: {load_15:.1f}  cores: {cores}",
-            fix=fix,
-        ))
+        result.findings.append(
+            Finding(
+                check="cpu_load",
+                severity=sev,
+                summary=summary,
+                details=f"1m: {load_1:.1f}  5m: {load_5:.1f}  15m: {load_15:.1f}  cores: {cores}",
+                fix=fix,
+            )
+        )
     except OSError:
-        result.findings.append(Finding(
-            check="cpu_load",
-            severity=Severity.INFO,
-            summary="Could not read load average",
-        ))
+        result.findings.append(
+            Finding(
+                check="cpu_load",
+                severity=Severity.INFO,
+                summary="Could not read load average",
+            )
+        )
 
     # --- Top CPU consumers ---
     try:
         out = subprocess.run(
             ["ps", "-eo", "pid,pcpu,pmem,comm", "-r"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if out.returncode == 0:
             lines = out.stdout.strip().split("\n")[1:]  # skip header
@@ -95,29 +105,37 @@ def check_cpu_load() -> CheckResult:
                 for pid, cpu_pct, mem_pct, name in hogs:
                     tag = categorized.get(name, "")
                     tag_str = f" [{tag}]" if tag else ""
-                    details_lines.append(f"  {name:30s} {cpu_pct:5.1f}% CPU  {mem_pct:4.1f}% MEM  (PID {pid}){tag_str}")
+                    details_lines.append(
+                        f"  {name:30s} {cpu_pct:5.1f}% CPU  {mem_pct:4.1f}% MEM  (PID {pid}){tag_str}"
+                    )
 
                 fix = ""
                 if sev != Severity.OK:
-                    killable = [n for n, t in categorized.items() if t in ("cloud-sync", "vm", "build")]
+                    killable = [
+                        n for n, t in categorized.items() if t in ("cloud-sync", "vm", "build")
+                    ]
                     if killable:
                         fix = f"Consider stopping: {', '.join(killable)}"
                     else:
                         fix = "Review top consumers — kill or defer non-essential work"
 
-                result.findings.append(Finding(
-                    check="cpu_load",
-                    severity=sev,
-                    summary=f"{len(hogs)} process{'es' if len(hogs) != 1 else ''} using >10% CPU (total: {total_cpu:.0f}%)",
-                    details="\n".join(details_lines),
-                    fix=fix,
-                ))
+                result.findings.append(
+                    Finding(
+                        check="cpu_load",
+                        severity=sev,
+                        summary=f"{len(hogs)} process{'es' if len(hogs) != 1 else ''} using >10% CPU (total: {total_cpu:.0f}%)",
+                        details="\n".join(details_lines),
+                        fix=fix,
+                    )
+                )
             else:
-                result.findings.append(Finding(
-                    check="cpu_load",
-                    severity=Severity.OK,
-                    summary="No processes above 10% CPU",
-                ))
+                result.findings.append(
+                    Finding(
+                        check="cpu_load",
+                        severity=Severity.OK,
+                        summary="No processes above 10% CPU",
+                    )
+                )
     except (subprocess.TimeoutExpired, OSError):
         pass
 

@@ -21,7 +21,9 @@ def check_thermal() -> CheckResult:
     try:
         out = subprocess.run(
             ["sysctl", "-n", "kern.thermalpressurelevel"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if out.returncode == 0 and out.stdout.strip().isdigit():
             thermal_found = True
@@ -37,20 +39,26 @@ def check_thermal() -> CheckResult:
 
             fix = ""
             if sev == Severity.CRITICAL:
-                fix = ("Mac is thermally throttled — CPU speed is reduced to prevent damage. "
-                       "Move to a cooler surface, check vents aren't blocked, close heavy apps. "
-                       "If persistent, SMC reset: shut down, hold power 10s, release, wait 5s, boot.")
+                fix = (
+                    "Mac is thermally throttled — CPU speed is reduced to prevent damage. "
+                    "Move to a cooler surface, check vents aren't blocked, close heavy apps. "
+                    "If persistent, SMC reset: shut down, hold power 10s, release, wait 5s, boot."
+                )
             elif sev == Severity.WARNING:
-                fix = ("Thermal pressure is elevated — performance may degrade. "
-                       "Reduce load or improve airflow.")
+                fix = (
+                    "Thermal pressure is elevated — performance may degrade. "
+                    "Reduce load or improve airflow."
+                )
 
-            result.findings.append(Finding(
-                check="thermal",
-                severity=sev,
-                summary=f"Thermal pressure: {label}",
-                details=f"kern.thermalpressurelevel = {level}",
-                fix=fix,
-            ))
+            result.findings.append(
+                Finding(
+                    check="thermal",
+                    severity=sev,
+                    summary=f"Thermal pressure: {label}",
+                    details=f"kern.thermalpressurelevel = {level}",
+                    fix=fix,
+                )
+            )
     except (subprocess.TimeoutExpired, OSError):
         pass
 
@@ -59,7 +67,9 @@ def check_thermal() -> CheckResult:
         try:
             out = subprocess.run(
                 ["pmset", "-g", "therm"],
-                capture_output=True, text=True, timeout=5,
+                capture_output=True,
+                text=True,
+                timeout=5,
             )
             if out.returncode == 0:
                 output = out.stdout.lower()
@@ -75,31 +85,37 @@ def check_thermal() -> CheckResult:
 
                 fix = ""
                 if sev == Severity.WARNING:
-                    fix = ("Thermal or performance warning active — reduce workload or improve airflow.")
+                    fix = "Thermal or performance warning active — reduce workload or improve airflow."
 
-                result.findings.append(Finding(
-                    check="thermal",
-                    severity=sev,
-                    summary=f"Thermal pressure: {label}",
-                    details=out.stdout.strip(),
-                    fix=fix,
-                ))
+                result.findings.append(
+                    Finding(
+                        check="thermal",
+                        severity=sev,
+                        summary=f"Thermal pressure: {label}",
+                        details=out.stdout.strip(),
+                        fix=fix,
+                    )
+                )
                 thermal_found = True
         except (subprocess.TimeoutExpired, OSError):
             pass
 
     if not thermal_found:
-        result.findings.append(Finding(
-            check="thermal",
-            severity=Severity.OK,
-            summary="Thermal monitoring: no warnings detected",
-        ))
+        result.findings.append(
+            Finding(
+                check="thermal",
+                severity=Severity.OK,
+                summary="Thermal monitoring: no warnings detected",
+            )
+        )
 
     # --- kernel_task CPU usage (thermal throttling indicator) ---
     try:
         out = subprocess.run(
             ["ps", "-eo", "pid,pcpu,comm"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if out.returncode == 0:
             for line in out.stdout.strip().split("\n")[1:]:
@@ -108,7 +124,9 @@ def check_thermal() -> CheckResult:
                     cpu_pct = float(parts[1])
                     if cpu_pct > 200:
                         sev = Severity.CRITICAL
-                        summary = f"kernel_task at {cpu_pct:.0f}% CPU — Mac is heavily thermal-throttled"
+                        summary = (
+                            f"kernel_task at {cpu_pct:.0f}% CPU — Mac is heavily thermal-throttled"
+                        )
                     elif cpu_pct > 50:
                         sev = Severity.WARNING
                         summary = f"kernel_task at {cpu_pct:.0f}% CPU — thermal throttling active"
@@ -121,16 +139,20 @@ def check_thermal() -> CheckResult:
 
                     fix = ""
                     if sev in (Severity.CRITICAL, Severity.WARNING):
-                        fix = ("kernel_task uses CPU to generate idle cycles (heat management). "
-                               "Reduce workload, improve ventilation, or use a cooling pad.")
+                        fix = (
+                            "kernel_task uses CPU to generate idle cycles (heat management). "
+                            "Reduce workload, improve ventilation, or use a cooling pad."
+                        )
 
-                    result.findings.append(Finding(
-                        check="thermal",
-                        severity=sev,
-                        summary=summary,
-                        details=f"kernel_task PID {parts[0]} at {cpu_pct}% CPU",
-                        fix=fix,
-                    ))
+                    result.findings.append(
+                        Finding(
+                            check="thermal",
+                            severity=sev,
+                            summary=summary,
+                            details=f"kernel_task PID {parts[0]} at {cpu_pct}% CPU",
+                            fix=fix,
+                        )
+                    )
                     break
     except (subprocess.TimeoutExpired, OSError):
         pass
@@ -139,26 +161,32 @@ def check_thermal() -> CheckResult:
     try:
         out = subprocess.run(
             ["powermetrics", "--samplers", "smc", "-n", "1", "-i", "1"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if out.returncode == 0 and "Fan" in out.stdout:
             for line in out.stdout.split("\n"):
                 if "Fan" in line and "rpm" in line.lower():
-                    result.findings.append(Finding(
-                        check="thermal",
-                        severity=Severity.INFO,
-                        summary=line.strip(),
-                    ))
+                    result.findings.append(
+                        Finding(
+                            check="thermal",
+                            severity=Severity.INFO,
+                            summary=line.strip(),
+                        )
+                    )
                     break
     except (subprocess.TimeoutExpired, OSError, PermissionError):
         # powermetrics requires root — that's fine, skip it
         pass
 
     if not result.findings:
-        result.findings.append(Finding(
-            check="thermal",
-            severity=Severity.OK,
-            summary="Thermal state: normal",
-        ))
+        result.findings.append(
+            Finding(
+                check="thermal",
+                severity=Severity.OK,
+                summary="Thermal state: normal",
+            )
+        )
 
     return result

@@ -42,7 +42,11 @@ def _identify_process(args: str) -> str:
     binary = parts[0].rsplit("/", 1)[-1]
 
     # uvicorn / gunicorn — can be invoked directly, not through python
-    if binary in ("uvicorn", "gunicorn") or binary.endswith("uvicorn") or binary.endswith("gunicorn"):
+    if (
+        binary in ("uvicorn", "gunicorn")
+        or binary.endswith("uvicorn")
+        or binary.endswith("gunicorn")
+    ):
         app = parts[1].split(":")[0] if len(parts) > 1 and not parts[1].startswith("-") else "?"
         app_short = ".".join(app.split(".")[:2]) if "." in app else app
         return f"uvicorn:{app_short}"
@@ -74,7 +78,7 @@ def _identify_process(args: str) -> str:
             script_name = p.rsplit("/", 1)[-1]
             if "/" in p and "/bin/" in p and not script_name.startswith("python"):
                 # It's an installed script like railguey, omni-mcp, etc.
-                extra = " ".join(parts[parts.index(p) + 1:])[:20]
+                extra = " ".join(parts[parts.index(p) + 1 :])[:20]
                 label = script_name
                 if extra:
                     label = f"{script_name} {extra}".strip()
@@ -120,7 +124,9 @@ def sample() -> dict:
     try:
         out = subprocess.run(
             ["ps", "-eo", "pcpu,args", "-r"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if out.returncode == 0:
             hogs = []
@@ -140,7 +146,9 @@ def sample() -> dict:
     try:
         out = subprocess.run(
             ["sysctl", "-n", "kern.thermalpressurelevel"],
-            capture_output=True, text=True, timeout=3,
+            capture_output=True,
+            text=True,
+            timeout=3,
         )
         if out.returncode == 0 and out.stdout.strip().isdigit():
             s["thermal"] = int(out.stdout.strip())
@@ -151,7 +159,9 @@ def sample() -> dict:
         try:
             out = subprocess.run(
                 ["pmset", "-g", "therm"],
-                capture_output=True, text=True, timeout=3,
+                capture_output=True,
+                text=True,
+                timeout=3,
             )
             if out.returncode == 0:
                 lower = out.stdout.lower()
@@ -166,7 +176,9 @@ def sample() -> dict:
     try:
         out = subprocess.run(
             ["sysctl", "vm.swapusage"],
-            capture_output=True, text=True, timeout=3,
+            capture_output=True,
+            text=True,
+            timeout=3,
         )
         if out.returncode == 0 and "used" in out.stdout:
             used_str = out.stdout.split("used = ")[1].split(" ")[0]
@@ -282,23 +294,27 @@ def analyze_vitals(minutes: int = 60) -> dict:
                     spike_top = s.get("top", [])
         elif in_spike:
             in_spike = False
-            spikes.append({
-                "start": spike_start,
-                "end": s["ts"],
-                "peak_load": round(spike_peak, 1),
-                "top_processes": spike_top[:3],
-            })
+            spikes.append(
+                {
+                    "start": spike_start,
+                    "end": s["ts"],
+                    "peak_load": round(spike_peak, 1),
+                    "top_processes": spike_top[:3],
+                }
+            )
             spike_start = None
 
     # Close unclosed spike
     if in_spike and spike_start:
-        spikes.append({
-            "start": spike_start,
-            "end": samples[-1]["ts"],
-            "peak_load": round(spike_peak, 1),
-            "top_processes": spike_top[:3],
-            "ongoing": True,
-        })
+        spikes.append(
+            {
+                "start": spike_start,
+                "end": samples[-1]["ts"],
+                "peak_load": round(spike_peak, 1),
+                "top_processes": spike_top[:3],
+                "ongoing": True,
+            }
+        )
 
     # Thermal analysis
     thermal_levels = [(s["ts"], s["thermal"]) for s in samples if "thermal" in s]
@@ -318,8 +334,12 @@ def analyze_vitals(minutes: int = 60) -> dict:
             cpu = item[0]
             if name not in proc_stats:
                 proc_stats[name] = {
-                    "appearances": 0, "peak_cpu": 0, "total_cpu": 0,
-                    "first_seen": i, "last_seen": i, "cpu_series": [],
+                    "appearances": 0,
+                    "peak_cpu": 0,
+                    "total_cpu": 0,
+                    "first_seen": i,
+                    "last_seen": i,
+                    "cpu_series": [],
                 }
             proc_stats[name]["appearances"] += 1
             proc_stats[name]["peak_cpu"] = max(proc_stats[name]["peak_cpu"], cpu)
@@ -363,9 +383,7 @@ def analyze_vitals(minutes: int = 60) -> dict:
             "peak_mb": swap_peak[1] if swap_peak[0] else 0,
             "peak_ts": swap_peak[0],
         },
-        "worst_offenders": [
-            {"name": name, **stats} for name, stats in worst
-        ],
+        "worst_offenders": [{"name": name, **stats} for name, stats in worst],
     }
 
 

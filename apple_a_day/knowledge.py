@@ -11,7 +11,7 @@ TOPICS: dict[str, dict[str, str]] = {
         "what": (
             "Swap is overflow storage. When your Mac runs out of RAM, "
             "it moves data from memory onto your SSD. This is called "
-            "\"swapping.\" The data is still accessible, but reading from "
+            '"swapping." The data is still accessible, but reading from '
             "SSD is 10-100x slower than reading from RAM."
         ),
         "why": (
@@ -30,7 +30,6 @@ TOPICS: dict[str, dict[str, str]] = {
             "4. Long-term: close apps you're not actively using, or add more RAM (not possible on Apple Silicon — it's soldered)"
         ),
     },
-
     "kernel_panic": {
         "what": (
             "A kernel panic is macOS's equivalent of a Blue Screen of Death. "
@@ -53,7 +52,6 @@ TOPICS: dict[str, dict[str, str]] = {
             "run Apple Diagnostics (hold D at boot), check for macOS updates"
         ),
     },
-
     "watchdog_timeout": {
         "what": (
             "macOS runs a watchdog daemon that checks in with the kernel every second. "
@@ -73,7 +71,6 @@ TOPICS: dict[str, dict[str, str]] = {
             "4. Run `aad checkup -c cpu_load -c launch_agents` to identify the load sources"
         ),
     },
-
     "crash_loop": {
         "what": (
             "A crash loop happens when a service crashes, macOS automatically restarts it "
@@ -94,7 +91,6 @@ TOPICS: dict[str, dict[str, str]] = {
             "4. Run `aad checkup -c launch_agents` to find all crash-looping services"
         ),
     },
-
     "memory_pressure": {
         "what": (
             "Memory pressure is macOS's measure of how hard the system is working "
@@ -115,7 +111,6 @@ TOPICS: dict[str, dict[str, str]] = {
             "4. If chronic: you may be running a workload that exceeds your RAM"
         ),
     },
-
     "load_average": {
         "what": (
             "Load average is the number of processes waiting for CPU time, "
@@ -137,7 +132,6 @@ TOPICS: dict[str, dict[str, str]] = {
             "Sustained load > 3x cores for 15+ minutes is a problem."
         ),
     },
-
     "thermal_throttling": {
         "what": (
             "When your Mac gets too hot, it deliberately slows down the CPU "
@@ -159,7 +153,6 @@ TOPICS: dict[str, dict[str, str]] = {
             "5. If persistent: SMC reset (shut down, hold power 10s, release, wait 5s, boot)"
         ),
     },
-
     "disk_pressure": {
         "what": (
             "macOS needs free disk space to function. It uses free space for "
@@ -180,7 +173,6 @@ TOPICS: dict[str, dict[str, str]] = {
             "6. Use `aad checkup -c disk_health` for specific recommendations"
         ),
     },
-
     "orphaned_agent": {
         "what": (
             "An orphaned launch agent is a background service that's still registered "
@@ -198,7 +190,6 @@ TOPICS: dict[str, dict[str, str]] = {
             "3. Run `aad checkup -c cleanup` to find all orphaned agents"
         ),
     },
-
     "shutdown_cause": {
         "what": (
             "Every time your Mac shuts down, macOS logs a numeric cause code. "

@@ -27,10 +27,13 @@ def _rotate_if_needed():
 def _detect_trigger() -> str:
     """Detect what triggered this checkup: boot, daily, or manual."""
     import subprocess
+
     try:
         out = subprocess.run(
             ["sysctl", "-n", "kern.boottime"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         # kern.boottime format: "{ sec = 1711108800, usec = 0 } ..."
         boot_sec = int(out.stdout.split("sec = ")[1].split(",")[0])
@@ -191,7 +194,13 @@ def trend_summary() -> dict | None:
     for e in entries:
         for c in e.get("criticals", []) + e.get("warnings", []):
             # Normalize: strip numbers and dates for grouping
-            key = c.split(" crashed ")[0] if " crashed " in c else c.split(" on ")[0] if " on " in c else c[:50]
+            key = (
+                c.split(" crashed ")[0]
+                if " crashed " in c
+                else c.split(" on ")[0]
+                if " on " in c
+                else c[:50]
+            )
             issue_counts[key] = issue_counts.get(key, 0) + 1
 
     threshold = len(entries) * 0.5
@@ -200,14 +209,20 @@ def trend_summary() -> dict | None:
     # Trend: compare first half vs second half
     mid = len(entries) // 2
     first_half_avg = sum(e["counts"].get("critical", 0) for e in entries[:mid]) / max(mid, 1)
-    second_half_avg = sum(e["counts"].get("critical", 0) for e in entries[mid:]) / max(len(entries) - mid, 1)
+    second_half_avg = sum(e["counts"].get("critical", 0) for e in entries[mid:]) / max(
+        len(entries) - mid, 1
+    )
 
     return {
         "entries": len(entries),
         "first": entries[0].get("ts", "")[:10],
         "last": entries[-1].get("ts", "")[:10],
-        "avg_criticals": round(sum(e["counts"].get("critical", 0) for e in entries) / len(entries), 1),
-        "avg_warnings": round(sum(e["counts"].get("warning", 0) for e in entries) / len(entries), 1),
+        "avg_criticals": round(
+            sum(e["counts"].get("critical", 0) for e in entries) / len(entries), 1
+        ),
+        "avg_warnings": round(
+            sum(e["counts"].get("warning", 0) for e in entries) / len(entries), 1
+        ),
         "improving": second_half_avg < first_half_avg,
         "recurring": recurring,
     }

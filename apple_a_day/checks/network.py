@@ -13,10 +13,13 @@ def check_network() -> CheckResult:
     try:
         out = subprocess.run(
             ["system_profiler", "SPAirPortDataType", "-json"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         if out.returncode == 0:
             import json
+
             data = json.loads(out.stdout)
             ap = data.get("SPAirPortDataType", [{}])[0]
             ifaces = ap.get("spairport_airport_interfaces", [])
@@ -54,35 +57,52 @@ def check_network() -> CheckResult:
                         snr = f", SNR {rssi_val - noise_val} dB"
 
                     phy_label = f" ({phy})" if phy else ""
-                    result.findings.append(Finding(
-                        check="network", severity=sev,
-                        summary=f"Wi-Fi: {quality} signal ({rssi_val} dBm{snr}) on '{ssid}' {channel_info}{phy_label}",
-                        fix="Move closer to router or switch to 5GHz band" if sev != Severity.OK else "",
-                    ))
+                    result.findings.append(
+                        Finding(
+                            check="network",
+                            severity=sev,
+                            summary=f"Wi-Fi: {quality} signal ({rssi_val} dBm{snr}) on '{ssid}' {channel_info}{phy_label}",
+                            fix="Move closer to router or switch to 5GHz band"
+                            if sev != Severity.OK
+                            else "",
+                        )
+                    )
                 elif ssid:
-                    result.findings.append(Finding(
-                        check="network", severity=Severity.OK,
-                        summary=f"Wi-Fi: connected to '{ssid}' on {channel_info}",
-                    ))
+                    result.findings.append(
+                        Finding(
+                            check="network",
+                            severity=Severity.OK,
+                            summary=f"Wi-Fi: connected to '{ssid}' on {channel_info}",
+                        )
+                    )
                 else:
-                    result.findings.append(Finding(
-                        check="network", severity=Severity.INFO,
-                        summary="Wi-Fi: not connected to any network",
-                    ))
+                    result.findings.append(
+                        Finding(
+                            check="network",
+                            severity=Severity.INFO,
+                            summary="Wi-Fi: not connected to any network",
+                        )
+                    )
     except (subprocess.TimeoutExpired, OSError, ValueError):
-        result.findings.append(Finding(
-            check="network", severity=Severity.INFO,
-            summary="Wi-Fi: could not query wireless status",
-        ))
+        result.findings.append(
+            Finding(
+                check="network",
+                severity=Severity.INFO,
+                summary="Wi-Fi: could not query wireless status",
+            )
+        )
 
     # networkQuality (macOS 12+)
     try:
         out = subprocess.run(
             ["networkQuality", "-s", "-c"],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if out.returncode == 0:
             import json
+
             data = json.loads(out.stdout)
 
             dl = data.get("dl_throughput", 0)
@@ -111,27 +131,41 @@ def check_network() -> CheckResult:
             else:
                 resp_label = "low"
 
-            result.findings.append(Finding(
-                check="network", severity=sev,
-                summary=f"Speed: {dl_mbps} Mbps down / {ul_mbps} Mbps up — responsiveness: {resp_label} ({avg_rpm} RPM)",
-                details=f"Download: {dl_mbps} Mbps, Upload: {ul_mbps} Mbps, Responsiveness: {avg_rpm} RPM",
-                fix="Check for bandwidth-heavy apps or switch networks" if sev != Severity.OK else "",
-            ))
+            result.findings.append(
+                Finding(
+                    check="network",
+                    severity=sev,
+                    summary=f"Speed: {dl_mbps} Mbps down / {ul_mbps} Mbps up — responsiveness: {resp_label} ({avg_rpm} RPM)",
+                    details=f"Download: {dl_mbps} Mbps, Upload: {ul_mbps} Mbps, Responsiveness: {avg_rpm} RPM",
+                    fix="Check for bandwidth-heavy apps or switch networks"
+                    if sev != Severity.OK
+                    else "",
+                )
+            )
     except (subprocess.TimeoutExpired, OSError):
-        result.findings.append(Finding(
-            check="network", severity=Severity.INFO,
-            summary="Network speed: could not run networkQuality (requires macOS 12+)",
-        ))
+        result.findings.append(
+            Finding(
+                check="network",
+                severity=Severity.INFO,
+                summary="Network speed: could not run networkQuality (requires macOS 12+)",
+            )
+        )
     except (ValueError, KeyError):
-        result.findings.append(Finding(
-            check="network", severity=Severity.INFO,
-            summary="Network speed: could not parse networkQuality output",
-        ))
+        result.findings.append(
+            Finding(
+                check="network",
+                severity=Severity.INFO,
+                summary="Network speed: could not parse networkQuality output",
+            )
+        )
 
     if not result.findings:
-        result.findings.append(Finding(
-            check="network", severity=Severity.INFO,
-            summary="Network health checks unavailable",
-        ))
+        result.findings.append(
+            Finding(
+                check="network",
+                severity=Severity.INFO,
+                summary="Network health checks unavailable",
+            )
+        )
 
     return result

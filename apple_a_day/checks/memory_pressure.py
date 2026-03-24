@@ -15,7 +15,9 @@ def check_memory_pressure() -> CheckResult:
     try:
         out = subprocess.run(
             ["/usr/bin/memory_pressure", "-Q"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
         output = out.stdout.lower()
 
@@ -36,25 +38,31 @@ def check_memory_pressure() -> CheckResult:
             if ctx.get("is_ai_user"):
                 fix += ". Local LLM models (Ollama) can consume 4-16 GB each."
 
-        result.findings.append(Finding(
-            check="memory_pressure",
-            severity=severity,
-            summary=f"Memory pressure: {level}",
-            details=out.stdout.strip().split("\n")[-1] if out.stdout else "",
-            fix=fix,
-        ))
+        result.findings.append(
+            Finding(
+                check="memory_pressure",
+                severity=severity,
+                summary=f"Memory pressure: {level}",
+                details=out.stdout.strip().split("\n")[-1] if out.stdout else "",
+                fix=fix,
+            )
+        )
     except (subprocess.TimeoutExpired, OSError) as e:
-        result.findings.append(Finding(
-            check="memory_pressure",
-            severity=Severity.INFO,
-            summary=f"Could not read memory pressure: {e}",
-        ))
+        result.findings.append(
+            Finding(
+                check="memory_pressure",
+                severity=Severity.INFO,
+                summary=f"Could not read memory pressure: {e}",
+            )
+        )
 
     # Check swap usage via sysctl
     try:
         out = subprocess.run(
             ["sysctl", "vm.swapusage"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         parts = out.stdout.strip()
         if "used" in parts:
@@ -74,17 +82,21 @@ def check_memory_pressure() -> CheckResult:
             fix = ""
             if sev != Severity.OK:
                 ram = ctx.get("memory_gb", "?")
-                fix = (f"Swap at {used_str}M with {ram} GB RAM — "
-                       f"your Mac is running on SSD, not memory. "
-                       f"Reboot to clear swap, then find the memory hog.")
+                fix = (
+                    f"Swap at {used_str}M with {ram} GB RAM — "
+                    f"your Mac is running on SSD, not memory. "
+                    f"Reboot to clear swap, then find the memory hog."
+                )
 
-            result.findings.append(Finding(
-                check="memory_pressure",
-                severity=sev,
-                summary=f"Swap usage: {used_str}M",
-                details=parts,
-                fix=fix,
-            ))
+            result.findings.append(
+                Finding(
+                    check="memory_pressure",
+                    severity=sev,
+                    summary=f"Swap usage: {used_str}M",
+                    details=parts,
+                    fix=fix,
+                )
+            )
     except (subprocess.TimeoutExpired, OSError, ValueError, IndexError):
         pass
 

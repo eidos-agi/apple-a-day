@@ -43,8 +43,10 @@ def get_app_metadata(app_path: str) -> dict:
         for uti in doc_type.get("LSItemContentTypes", []):
             utis.add(uti)
 
-    name = info.get("CFBundleName", info.get("CFBundleDisplayName",
-           os.path.basename(app_path).replace(".app", "")))
+    name = info.get(
+        "CFBundleName",
+        info.get("CFBundleDisplayName", os.path.basename(app_path).replace(".app", "")),
+    )
 
     base = {
         "name": name,
@@ -56,6 +58,7 @@ def get_app_metadata(app_path: str) -> dict:
 
     # Enrich with deeper signals from feature_extraction
     from .feature_extraction import extract_features
+
     base.update(extract_features(app_path))
     return base
 
@@ -152,12 +155,14 @@ def find_redundant_apps(installed_apps: list[dict]) -> list[dict]:
                 best_reason = _explain_similarity(stale["meta"], active["meta"])
 
         if best_match and best_score >= 0.5:
-            redundant.append({
-                "unused": stale,
-                "active": best_match,
-                "score": best_score,
-                "reason": best_reason,
-            })
+            redundant.append(
+                {
+                    "unused": stale,
+                    "active": best_match,
+                    "score": best_score,
+                    "reason": best_reason,
+                }
+            )
 
     redundant.sort(key=lambda x: x["score"], reverse=True)
     return redundant
@@ -167,18 +172,45 @@ def find_redundant_apps(installed_apps: list[dict]) -> list[dict]:
 
 _SYNONYM_GROUPS = [
     # Code editors / IDEs
-    {"VS Code", "Visual Studio Code", "Cursor", "Zed", "Sublime Text",
-     "Atom", "Nova", "TextMate", "BBEdit", "CotEditor"},
+    {
+        "VS Code",
+        "Visual Studio Code",
+        "Cursor",
+        "Zed",
+        "Sublime Text",
+        "Atom",
+        "Nova",
+        "TextMate",
+        "BBEdit",
+        "CotEditor",
+    },
     # Browsers
-    {"Safari", "Google Chrome", "Firefox", "Brave Browser", "Arc",
-     "Microsoft Edge", "Opera", "Vivaldi", "Chromium"},
+    {
+        "Safari",
+        "Google Chrome",
+        "Firefox",
+        "Brave Browser",
+        "Arc",
+        "Microsoft Edge",
+        "Opera",
+        "Vivaldi",
+        "Chromium",
+    },
     # Terminals
     {"Terminal", "iTerm2", "iTerm", "Warp", "Alacritty", "Kitty", "Hyper"},
     # Git clients
     {"Tower", "Fork", "GitKraken", "Sourcetree", "GitHub Desktop", "Git"},
     # Database tools
-    {"DBeaver", "DBeaver 2", "TablePlus", "Postico", "Sequel Pro",
-     "DataGrip", "pgAdmin", "Azure Data Studio"},
+    {
+        "DBeaver",
+        "DBeaver 2",
+        "TablePlus",
+        "Postico",
+        "Sequel Pro",
+        "DataGrip",
+        "pgAdmin",
+        "Azure Data Studio",
+    },
     # Note taking
     {"Notes", "Obsidian", "Notion", "Bear", "Craft", "Evernote", "Joplin"},
     # Design
@@ -206,8 +238,14 @@ _SYNONYM_GROUPS = [
     # Screen recording
     {"Camtasia", "Camtasia 2024", "OBS", "ScreenFlow", "CleanShot X", "Loom"},
     # Remote desktop
-    {"Splashtop Streamer", "Splashtop Business", "Chrome Remote Desktop Host",
-     "Chrome Remote Desktop Host Uninstaller", "AnyDesk", "TeamViewer"},
+    {
+        "Splashtop Streamer",
+        "Splashtop Business",
+        "Chrome Remote Desktop Host",
+        "Chrome Remote Desktop Host Uninstaller",
+        "AnyDesk",
+        "TeamViewer",
+    },
 ]
 
 
@@ -265,9 +303,16 @@ def _category_score(cat_a: str, cat_b: str) -> float:
 
 def _uti_overlap(utis_a: set, utis_b: set) -> float:
     """Jaccard similarity of UTI sets, ignoring very generic types."""
-    generic = {"public.data", "public.item", "public.content", "public.text",
-               "public.plain-text", "public.image", "public.movie",
-               "public.composite-content"}
+    generic = {
+        "public.data",
+        "public.item",
+        "public.content",
+        "public.text",
+        "public.plain-text",
+        "public.image",
+        "public.movie",
+        "public.composite-content",
+    }
     a = utis_a - generic
     b = utis_b - generic
     if not a or not b:
@@ -279,6 +324,7 @@ def _uti_overlap(utis_a: set, utis_b: set) -> float:
 
 def _text_similarity(app_a: dict, app_b: dict) -> float:
     """Simple word overlap between names and descriptions."""
+
     def words(app):
         text = f"{app.get('name', '')} {app.get('description', '')}".lower()
         return set(w for w in text.split() if len(w) > 2)
@@ -308,8 +354,14 @@ def _explain_similarity(meta_a: dict, meta_b: dict) -> str:
 
     utis_a = meta_a.get("utis", set())
     utis_b = meta_b.get("utis", set())
-    generic = {"public.data", "public.item", "public.content", "public.text",
-               "public.plain-text", "public.image"}
+    generic = {
+        "public.data",
+        "public.item",
+        "public.content",
+        "public.text",
+        "public.plain-text",
+        "public.image",
+    }
     overlap = (utis_a & utis_b) - generic
     if overlap:
         types = sorted(list(overlap))[:3]

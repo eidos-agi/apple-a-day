@@ -118,8 +118,15 @@ def _detect_workspace_shape() -> dict:
     }
 
     # Count repos
-    for repos_dir in [home / "repos", home / "repos-eidos-agi", home / "repos-aic",
-                      home / "Projects", home / "Developer", home / "code", home / "src"]:
+    for repos_dir in [
+        home / "repos",
+        home / "repos-eidos-agi",
+        home / "repos-aic",
+        home / "Projects",
+        home / "Developer",
+        home / "code",
+        home / "src",
+    ]:
         if repos_dir.exists():
             count = sum(1 for d in repos_dir.iterdir() if d.is_dir() and (d / ".git").exists())
             if count > 0:
@@ -158,6 +165,7 @@ def _detect_workspace_shape() -> dict:
 def _get_hardware() -> dict:
     """Get hardware profile."""
     import platform
+
     hw = {
         "os_version": platform.mac_ver()[0],
         "arch": platform.machine(),
@@ -172,7 +180,7 @@ def _get_hardware() -> dict:
             out = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
             val = out.stdout.strip()
             if key == "memory_gb":
-                val = round(int(val) / (1024 ** 3))
+                val = round(int(val) / (1024**3))
             hw[key] = val
         except (subprocess.TimeoutExpired, OSError, ValueError):
             pass
@@ -183,7 +191,7 @@ def _get_hardware() -> dict:
         for line in out.stdout.split("\n"):
             if "Disk Size" in line and "Bytes" in line:
                 b = int(line.split("(")[1].split(" Bytes")[0])
-                hw["disk_gb"] = round(b / (1000 ** 3))
+                hw["disk_gb"] = round(b / (1000**3))
                 break
     except (subprocess.TimeoutExpired, OSError, ValueError, IndexError):
         pass
