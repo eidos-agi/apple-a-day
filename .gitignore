@@ -29,3 +29,11 @@ Thumbs.db
 .mypy_cache/
 .coverage
 htmlcov/
+
+# Swift build artifacts
+.build/
+app/**/.build/
+*.o
+*.d
+*.swiftdeps
+
