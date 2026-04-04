@@ -1,0 +1,7 @@
+{
+  "name": "com.eidos.aad.browser",
+  "description": "apple-a-day browser activity logger",
+  "path": "PLACEHOLDER_WILL_BE_SET_BY_INSTALLER",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://PLACEHOLDER_EXTENSION_ID/"]
+}

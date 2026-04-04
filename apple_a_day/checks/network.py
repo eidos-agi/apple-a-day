@@ -1,4 +1,9 @@
-"""Check network health: throughput, latency, Wi-Fi signal quality."""
+"""Check network health: Wi-Fi signal quality and optional speed test.
+
+The Wi-Fi check is fast (< 2s) and always runs.
+The speed test (networkQuality) is slow (10-30s), consumes bandwidth,
+and only runs when explicitly requested via check_network_speed().
+"""
 
 import subprocess
 
@@ -6,10 +11,9 @@ from ..models import CheckResult, Finding, Severity
 
 
 def check_network() -> CheckResult:
-    """Check network quality and Wi-Fi signal strength."""
+    """Check Wi-Fi signal strength. Fast — no bandwidth test."""
     result = CheckResult(name="Network")
 
-    # Wi-Fi signal via system_profiler (replaces deprecated airport command)
     try:
         out = subprocess.run(
             ["system_profiler", "SPAirPortDataType", "-json"],
@@ -30,7 +34,6 @@ def check_network() -> CheckResult:
                 channel_info = ci.get("spairport_network_channel", "?")
                 phy = ci.get("spairport_network_phymode", "")
 
-                # Parse RSSI from "signal / noise" format (e.g. "-53 dBm / -95 dBm")
                 rssi_str = ci.get("spairport_signal_noise", "")
                 rssi_val = None
                 noise_val = None
@@ -92,7 +95,26 @@ def check_network() -> CheckResult:
             )
         )
 
-    # networkQuality (macOS 12+)
+    if not result.findings:
+        result.findings.append(
+            Finding(
+                check="network",
+                severity=Severity.INFO,
+                summary="Network health checks unavailable",
+            )
+        )
+
+    return result
+
+
+def check_network_speed() -> CheckResult:
+    """Run networkQuality speed test. Slow (10-30s), consumes bandwidth.
+
+    Not included in ALL_CHECKS — must be requested explicitly:
+        aad checkup -c network_speed
+    """
+    result = CheckResult(name="Network Speed")
+
     try:
         out = subprocess.run(
             ["networkQuality", "-s", "-c"],
@@ -107,13 +129,11 @@ def check_network() -> CheckResult:
 
             dl = data.get("dl_throughput", 0)
             ul = data.get("ul_throughput", 0)
-            # Throughput is in bits per second
             dl_mbps = round(dl / 1_000_000, 1)
             ul_mbps = round(ul / 1_000_000, 1)
 
             dl_responsiveness = data.get("dl_responsiveness", 0)
             ul_responsiveness = data.get("ul_responsiveness", 0)
-            # Responsiveness is in RPM (round trips per minute)
             avg_rpm = (dl_responsiveness + ul_responsiveness) // 2
 
             if dl_mbps < 5:
@@ -123,7 +143,6 @@ def check_network() -> CheckResult:
             else:
                 sev = Severity.OK
 
-            # Responsiveness rating (Apple's scale)
             if avg_rpm >= 200:
                 resp_label = "high"
             elif avg_rpm >= 60:
@@ -133,7 +152,7 @@ def check_network() -> CheckResult:
 
             result.findings.append(
                 Finding(
-                    check="network",
+                    check="network_speed",
                     severity=sev,
                     summary=f"Speed: {dl_mbps} Mbps down / {ul_mbps} Mbps up — responsiveness: {resp_label} ({avg_rpm} RPM)",
                     details=f"Download: {dl_mbps} Mbps, Upload: {ul_mbps} Mbps, Responsiveness: {avg_rpm} RPM",
@@ -145,7 +164,7 @@ def check_network() -> CheckResult:
     except (subprocess.TimeoutExpired, OSError):
         result.findings.append(
             Finding(
-                check="network",
+                check="network_speed",
                 severity=Severity.INFO,
                 summary="Network speed: could not run networkQuality (requires macOS 12+)",
             )
@@ -153,7 +172,7 @@ def check_network() -> CheckResult:
     except (ValueError, KeyError):
         result.findings.append(
             Finding(
-                check="network",
+                check="network_speed",
                 severity=Severity.INFO,
                 summary="Network speed: could not parse networkQuality output",
             )
@@ -162,9 +181,9 @@ def check_network() -> CheckResult:
     if not result.findings:
         result.findings.append(
             Finding(
-                check="network",
+                check="network_speed",
                 severity=Severity.INFO,
-                summary="Network health checks unavailable",
+                summary="Network speed test unavailable",
             )
         )
 

@@ -210,24 +210,70 @@ def _rotate_if_needed():
 
 
 def read_vitals(minutes: int = 60) -> list[dict]:
-    """Read vitals samples from the last N minutes."""
+    """Read vitals samples from the last N minutes.
+
+    Reads from the end of the file to avoid loading the entire log into memory.
+    Stops once it passes the time cutoff.
+    """
     if not VITALS_LOG.exists():
         return []
 
     cutoff = datetime.now().timestamp() - (minutes * 60)
     samples = []
 
-    for line in VITALS_LOG.read_text().strip().split("\n"):
-        if not line:
-            continue
-        try:
-            entry = json.loads(line)
-            ts = datetime.fromisoformat(entry["ts"]).timestamp()
-            if ts >= cutoff:
-                samples.append(entry)
-        except (json.JSONDecodeError, KeyError, ValueError):
-            continue
+    # Read line-by-line from end of file
+    try:
+        with open(VITALS_LOG, "rb") as f:
+            # Seek to end, read backwards in chunks
+            f.seek(0, 2)
+            file_size = f.tell()
+            if file_size == 0:
+                return []
 
+            chunk_size = 8192
+            remainder = b""
+            position = file_size
+
+            while position > 0:
+                read_size = min(chunk_size, position)
+                position -= read_size
+                f.seek(position)
+                chunk = f.read(read_size) + remainder
+
+                lines = chunk.split(b"\n")
+                # First element may be partial — save for next chunk
+                remainder = lines[0]
+
+                # Process lines from end to start (skip empty)
+                for raw_line in reversed(lines[1:]):
+                    if not raw_line.strip():
+                        continue
+                    try:
+                        entry = json.loads(raw_line)
+                        ts = datetime.fromisoformat(entry["ts"]).timestamp()
+                        if ts >= cutoff:
+                            samples.append(entry)
+                        else:
+                            # Past the cutoff — we're done
+                            samples.reverse()
+                            return samples
+                    except (json.JSONDecodeError, KeyError, ValueError):
+                        continue
+
+            # Process the final remainder
+            if remainder.strip():
+                try:
+                    entry = json.loads(remainder)
+                    ts = datetime.fromisoformat(entry["ts"]).timestamp()
+                    if ts >= cutoff:
+                        samples.append(entry)
+                except (json.JSONDecodeError, KeyError, ValueError):
+                    pass
+
+    except OSError:
+        return []
+
+    samples.reverse()
     return samples
 
 

@@ -183,16 +183,8 @@ def _find_stale_apps() -> list[dict]:
         else:
             days_ago = 999  # never used / unknown
 
-        # Get app size
-        try:
-            size_bytes = (
-                sum(f.stat().st_size for f in Path(app_path).rglob("*") if f.is_file())
-                if os.path.isdir(app_path)
-                else 0
-            )
-        except (OSError, PermissionError):
-            size_bytes = 0
-        size_mb = round(size_bytes / (1024 * 1024))
+        # Get app size via du (fast) instead of rglob (slow)
+        size_mb = _get_dir_size_mb(app_path)
 
         # Skip if used in the last 30 days
         if days_ago < 30:
@@ -374,6 +366,23 @@ def _find_crash_looping_agents() -> list[dict]:
                 )
 
     return looping
+
+
+def _get_dir_size_mb(path: str) -> int:
+    """Get directory size in MB via du (fast, no recursive Python walk)."""
+    try:
+        out = subprocess.run(
+            ["du", "-sk", path],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if out.returncode == 0:
+            kb = int(out.stdout.split()[0])
+            return round(kb / 1024)
+    except (subprocess.TimeoutExpired, OSError, ValueError, IndexError):
+        pass
+    return 0
 
 
 def _get_last_used(app_path: str) -> str | None:

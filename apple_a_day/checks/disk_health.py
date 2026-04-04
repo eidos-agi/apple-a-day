@@ -100,7 +100,6 @@ def check_disk_health() -> CheckResult:
         for container in containers:
             ref = container.get("ContainerReference", "unknown")
             volumes = container.get("Volumes", [])
-            [v.get("Roles", []) for v in volumes]
             result.findings.append(
                 Finding(
                     check="disk_health",

@@ -5,7 +5,7 @@ echo "→ Installing apple-a-day (zero dependencies)"
 sleep 0.5
 echo "$ pip install apple-a-day"
 sleep 0.3
-echo "Successfully installed apple-a-day-0.2.0"
+echo "Successfully installed apple-a-day-0.3.1"
 sleep 0.8
 
 echo ""

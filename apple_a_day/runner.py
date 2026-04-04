@@ -4,7 +4,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 
-from .checks import ALL_CHECKS
+from .checks import ALL_CHECKS, OPT_IN_CHECKS
 from .models import CheckError, CheckResult, ERR_TIMEOUT, ERR_UNKNOWN
 
 
@@ -94,7 +94,7 @@ def run_all_checks(parallel: bool = True) -> CheckupReport:
 
     if parallel:
         results: list[CheckResult] = []
-        with ThreadPoolExecutor(max_workers=len(ALL_CHECKS)) as pool:
+        with ThreadPoolExecutor(max_workers=min(6, len(ALL_CHECKS))) as pool:
             futures = {pool.submit(_run_check, fn): fn for fn in ALL_CHECKS}
             for future in as_completed(futures):
                 results.append(future.result())

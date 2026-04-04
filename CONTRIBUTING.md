@@ -52,7 +52,7 @@ Then register it in `apple_a_day/checks/__init__.py`.
 
 4. **Graceful failure.** If a check can't run (missing tool, permission denied, unexpected output), return an INFO finding explaining why — don't crash.
 
-5. **No heavy dependencies.** We use `click` and `rich` for the CLI. Check modules should use `subprocess` to call native tools. Avoid pulling in large libraries.
+5. **No heavy dependencies.** The CLI uses stdlib `argparse` with zero runtime dependencies. `rich` is available as an optional extra for formatted output. Check modules should use `subprocess` to call native tools. Avoid pulling in large libraries.
 
 ## Severity guidelines
 
@@ -82,7 +82,7 @@ ruff format .
 
 - One check module per PR (unless they're closely related)
 - Include example output showing what your check finds
-- Test on your own Mac first — we don't have CI for macOS yet
+- Test on your own Mac first — CI runs on macOS 14/15 but local testing catches issues faster
 - Keep PRs focused. Bug fixes and features are separate PRs.
 
 ## Reporting issues

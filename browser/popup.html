@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="header">
+    <span class="logo">🍎</span>
+    <span class="title">apple-a-day</span>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-value" id="tab-count">—</div>
+      <div class="stat-label">tabs open</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="window-count">—</div>
+      <div class="stat-label">windows</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="opened-today">—</div>
+      <div class="stat-label">opened today</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Oldest tab</div>
+    <div class="oldest" id="oldest-tab">—</div>
+  </div>
+
+  <div class="section">
+    <div class="section-label">Native host</div>
+    <div id="host-status" class="host-status">checking...</div>
+  </div>
+
+  <div class="footer">
+    <button id="export-btn">Export log</button>
+    <button id="snapshot-btn">Snapshot now</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

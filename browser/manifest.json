@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "apple-a-day Browser Monitor",
+  "version": "0.1.0",
+  "description": "Tab activity telemetry for apple-a-day Mac health diagnostics",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwXx/KcTtIyA0DX7uHqzVqbW7e9vuTWTZx3GIHPO9ykb21IsNntX5Zf6HlSyA/yEnvjWEr2OJznkHs0IEsrLog9HhyGTk7V4mTfxeydA5IRpqBeRFq504xsZWwL/BX9Q3ewe+6RqQbdtahWGNJ3pxqkM/7oVMuKcEmKjfr5rF+6HclJDyYYTDsOJy9bECDlAYT6m+j1IuJsT7CN4NdHF4DVvQ+I4CUuGUNCkc+gUP6szPs7JwIqaIdrHDx4gof6Iiqn/cdh0x00amUAp7GnA/sLYMTCDoxYiYbUITT5Fff/+hsE2MPFIkaqBNWs+yUMs/p5hqmJtiY5sTTaWvOksRrwIDAQAB",
+  "permissions": [
+    "tabs",
+    "storage",
+    "alarms",
+    "nativeMessaging"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

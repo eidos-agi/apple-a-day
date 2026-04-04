@@ -12,7 +12,7 @@ from .homebrew import check_homebrew
 from .security import check_security
 from .shutdown_causes import check_shutdown_causes
 from .thermal import check_thermal
-from .network import check_network
+from .network import check_network, check_network_speed
 
 ALL_CHECKS = [
     check_crash_loops,
@@ -28,4 +28,9 @@ ALL_CHECKS = [
     check_security,
     check_network,
     check_cleanup,
+]
+
+# Opt-in checks — not in ALL_CHECKS, available via `aad checkup -c <name>`
+OPT_IN_CHECKS = [
+    check_network_speed,
 ]

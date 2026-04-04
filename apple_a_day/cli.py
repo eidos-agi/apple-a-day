@@ -25,7 +25,20 @@ def _get_renderer():
 
 def _cmd_checkup(args):
     """Run all health checks."""
+    from .checks import OPT_IN_CHECKS
+
+    # Run opt-in checks if explicitly requested by name
+    extra_results = []
+    if args.check:
+        check_lower = {c.lower() for c in args.check}
+        for fn in OPT_IN_CHECKS:
+            name = fn.__name__.replace("check_", "")
+            if name in check_lower or fn.__name__ in check_lower:
+                extra_results.append(fn())
+
     report = run_all_checks(parallel=not args.no_parallel)
+    if extra_results:
+        report.results.extend(extra_results)
     min_idx = SEVERITY_ORDER.index(args.min_severity)
 
     results = report.results
@@ -116,16 +129,10 @@ def _cmd_score(args):
     print(f"\napple-a-day health score  {gc}{grade} ({score}/100)\033[0m  {ts}")
     print()
 
-    # Matrix as visual bars
-    dim_labels = {
-        "stability": "Stability  ",
-        "memory": "Memory     ",
-        "storage": "Storage    ",
-        "services": "Services   ",
-        "security": "Security   ",
-        "infra": "Infra      ",
-        "network": "Network    ",
-    }
+    # Matrix as visual bars — all 9 dimensions
+    from .models import DIMENSION_LABELS
+
+    dim_labels = {dim: f"{label:11s}" for dim, label in DIMENSION_LABELS.items()}
 
     for dim, label in dim_labels.items():
         val = matrix.get(dim, 100)
@@ -313,6 +320,18 @@ def _fmt_load(load_list):
     return "/".join(f"{v:.0f}" for v in load_list[:3])
 
 
+def _cmd_browser(args):
+    """Manage browser extension native host."""
+    from .browser import install, uninstall, status
+
+    if args.browser_action == "install":
+        print(install(args.extension_id))
+    elif args.browser_action == "uninstall":
+        print(uninstall())
+    elif args.browser_action == "status":
+        print(status())
+
+
 def _cmd_install(_args):
     """Install the vitals monitor daemon."""
     from .launchd import install
@@ -460,6 +479,16 @@ def main(argv=None):
     )
     p_vitals.add_argument("--json", action="store_true", dest="vitals_json", help="Output as JSON")
 
+    # browser (extension native host management)
+    p_browser = sub.add_parser("browser", help="Manage browser extension native messaging host")
+    browser_sub = p_browser.add_subparsers(dest="browser_action")
+    p_browser_install = browser_sub.add_parser("install", help="Install native messaging host")
+    p_browser_install.add_argument(
+        "--extension-id", default=None, help="Chrome extension ID (auto-detected if omitted)"
+    )
+    browser_sub.add_parser("uninstall", help="Remove native messaging host")
+    browser_sub.add_parser("status", help="Check native host installation status")
+
     # install / uninstall / status (daemon management)
     sub.add_parser("install", help="Install vitals monitor as a launchd daemon (samples every 60s)")
     sub.add_parser("uninstall", help="Remove the vitals monitor daemon")
@@ -486,6 +515,7 @@ def main(argv=None):
         "trend": _cmd_trend,
         "monitor": _cmd_monitor,
         "vitals": _cmd_vitals,
+        "browser": _cmd_browser,
         "install": _cmd_install,
         "uninstall": _cmd_uninstall,
         "status": _cmd_status,

@@ -76,66 +76,13 @@ def log_checkup(report, trigger: str | None = None) -> Path:
             elif sev == "warning":
                 warnings.append(f.summary)
 
-    # Score matrix: 7 dimensions, each 0-100
-    # Maps check names → dimensions (some checks contribute to multiple)
-    dimension_checks = {
-        "stability": ["Crash Loops", "Kernel Panics", "Shutdown Causes"],
-        "memory": ["Memory Pressure"],
-        "storage": ["Disk Health"],
-        "services": ["Launch Agents"],
-        "security": ["Security"],
-        "infra": ["Dynamic Library Health", "Homebrew"],
-        "network": ["Network"],
-        "cpu": ["CPU Load"],
-        "thermal": ["Thermal"],
-    }
+    # Score matrix (shared logic from models.py)
+    from .models import compute_score_matrix
 
-    # Score each check: 0 (critical found), 50 (warning), 80 (info only), 100 (all ok)
-    check_scores = {}
-    for r in report.results:
-        score = 100
-        for f in r.findings:
-            s = f.severity.value
-            if s == "critical":
-                score = min(score, 0)
-            elif s == "warning":
-                score = min(score, 50)
-            elif s == "info":
-                score = min(score, 80)
-        check_scores[r.name] = score
-
-    # Roll up to dimensions (worst score of contributing checks)
-    matrix = {}
-    for dim, checks in dimension_checks.items():
-        scores = [check_scores.get(c, 100) for c in checks]
-        matrix[dim] = min(scores) if scores else 100
-
-    # Overall: weighted — stability and memory matter more than network
-    weights = {
-        "stability": 3,
-        "cpu": 3,
-        "memory": 2,
-        "thermal": 2,
-        "storage": 2,
-        "services": 2,
-        "security": 1,
-        "infra": 1,
-        "network": 1,
-    }
-    weighted_sum = sum(matrix.get(d, 100) * w for d, w in weights.items())
-    total_weight = sum(weights.values())
-    overall = round(weighted_sum / total_weight)
-
-    if overall >= 90:
-        grade = "A"
-    elif overall >= 75:
-        grade = "B"
-    elif overall >= 50:
-        grade = "C"
-    elif overall >= 25:
-        grade = "D"
-    else:
-        grade = "F"
+    score_data = compute_score_matrix(report.results)
+    matrix = score_data["matrix"]
+    overall = score_data["score"]
+    grade = score_data["grade"]
 
     entry = {
         "ts": datetime.now().isoformat(timespec="seconds"),

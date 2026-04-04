@@ -107,41 +107,35 @@ def check_security() -> CheckResult:
     except (subprocess.TimeoutExpired, OSError):
         pass
 
-    # XProtect version / freshness
+    # XProtect version — read directly from bundle plist (instant, no system_profiler)
     try:
-        out = subprocess.run(
-            ["system_profiler", "SPInstallHistoryDataType", "-json"],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        if out.returncode == 0:
-            import json
+        import plistlib
+        from pathlib import Path
 
-            data = json.loads(out.stdout)
-            installs = data.get("SPInstallHistoryDataType", [])
-            xprotect_updates = [i for i in installs if "xprotect" in i.get("_name", "").lower()]
-            if xprotect_updates:
-                latest = xprotect_updates[-1]
-                name = latest.get("_name", "XProtect")
-                date = latest.get("install_date", "unknown")
-                result.findings.append(
-                    Finding(
-                        check="security",
-                        severity=Severity.OK,
-                        summary=f"XProtect: {name} (last updated: {date})",
-                    )
+        xprotect_plist = Path(
+            "/Library/Apple/System/Library/CoreServices/XProtect.bundle/Contents/version.plist"
+        )
+        if xprotect_plist.exists():
+            with open(xprotect_plist, "rb") as f:
+                info = plistlib.load(f)
+            version = info.get("CFBundleShortVersionString", "unknown")
+            result.findings.append(
+                Finding(
+                    check="security",
+                    severity=Severity.OK,
+                    summary=f"XProtect: version {version}",
+                    details="XProtect updates are applied automatically by macOS.",
                 )
-            else:
-                result.findings.append(
-                    Finding(
-                        check="security",
-                        severity=Severity.INFO,
-                        summary="XProtect: no update history found",
-                        details="XProtect updates are applied automatically by macOS.",
-                    )
+            )
+        else:
+            result.findings.append(
+                Finding(
+                    check="security",
+                    severity=Severity.INFO,
+                    summary="XProtect: bundle not found at expected path",
                 )
-    except (subprocess.TimeoutExpired, OSError, ValueError):
+            )
+    except (OSError, ValueError):
         pass
 
     if not result.findings:
