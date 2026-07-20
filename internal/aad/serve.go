@@ -64,6 +64,12 @@ func RunServer(addr string, interval time.Duration) error {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok\n"))
 	})
+	mux.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, VersionJSON())
+	})
+	mux.HandleFunc("/plugins", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, RenderPluginsJSON())
+	})
 	mux.HandleFunc("/score", warmed(ScoreJSONFromReport))
 	mux.HandleFunc("/checkup", warmed(RenderJSON))
 	mux.HandleFunc("/findings", warmed(func(rep CheckupReport) string {

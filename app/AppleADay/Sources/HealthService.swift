@@ -14,6 +14,8 @@ class HealthService: ObservableObject {
     @Published var isGeneratingReport = false
     @Published var pastReports: [ReportEntry] = []
     @Published var cliPath: String?
+    @Published var appVersion: VersionInfo?
+    @Published var plugins: [PluginInfo] = []
 
     private let logDir: String = {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
@@ -70,6 +72,8 @@ class HealthService: ObservableObject {
         loadLastCheckup()
         loadRecentVitals()
         loadScore()
+        loadVersion()
+        loadPlugins()
         checkDaemons()
         loadPastReports()
 
@@ -231,6 +235,28 @@ class HealthService: ObservableObject {
                 )
             }
         Self.log("Found \(pastReports.count) past reports")
+    }
+
+    // MARK: - Version + Plugins (from the daemon — proof of what's running)
+
+    private func loadVersion() {
+        Task {
+            guard let json = await daemonGet("/version"),
+                  let data = json.data(using: .utf8),
+                  let v = try? JSONDecoder().decode(VersionInfo.self, from: data) else { return }
+            appVersion = v
+            Self.log("Version: \(v.version) \(v.shortCommit)")
+        }
+    }
+
+    private func loadPlugins() {
+        Task {
+            guard let json = await daemonGet("/plugins"),
+                  let data = json.data(using: .utf8),
+                  let list = try? JSONDecoder().decode([PluginInfo].self, from: data) else { return }
+            plugins = list
+            Self.log("Plugins: \(list.filter { $0.isActive }.count) active")
+        }
     }
 
     // MARK: - Daemon Client (aad serve)

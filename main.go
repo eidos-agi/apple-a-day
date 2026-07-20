@@ -25,6 +25,8 @@ func main() {
 		scoreCmd(os.Args[2:])
 	case "serve":
 		serveCmd(os.Args[2:])
+	case "version", "--version":
+		fmt.Println(aad.VersionJSON())
 	case "-h", "--help", "help":
 		usage()
 	default:

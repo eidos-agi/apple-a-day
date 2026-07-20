@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.eidos.aad-serve</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/dshanklinbv/.local/bin/aad</string>
+        <string>serve</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <!-- launchd's default PATH lacks brew/pyenv/local — checks that shell out
+             to space-hog, brew, tailscale, docker need these. -->
+        <key>PATH</key>
+        <string>/Users/dshanklinbv/.local/bin:/Users/dshanklinbv/.pyenv/shims:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/Users/dshanklinbv/.config/eidos/aad-logs/serve.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/dshanklinbv/.config/eidos/aad-logs/serve.err</string>
+</dict>
+</plist>
