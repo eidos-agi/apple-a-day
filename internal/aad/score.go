@@ -2,16 +2,17 @@ package aad
 
 // Health score matrix — verbatim port of Python compute_score_matrix so Go and
 // the Python oracle produce identical scores during the transition.
-// ponytail: "Resource Sentinel" and "Tailscale" aren't in any dimension here —
-// that matches Python today (both are surfaced but unscored). Add to both maps
-// together if they should count toward the score.
+// ponytail: "Tailscale" stays unscored (matches Python — surfaced, not graded).
+// Resource Sentinel + Space Hogs ARE scored under storage so a downed guardian
+// (CRITICAL) or a lot of reclaimable cruft (INFO→floor 80) moves the grade
+// instead of the checkup reading a false 100/A.
 
 var dimensionChecks = map[string][]string{
 	"stability": {"Crash Loops", "Kernel Panics", "Shutdown Causes"},
 	"cpu":       {"CPU Load", "Agent Sprawl"},
 	"thermal":   {"Thermal"},
 	"memory":    {"Memory Pressure"},
-	"storage":   {"Disk Health", "Docker Volumes"},
+	"storage":   {"Disk Health", "Docker Volumes", "Resource Sentinel", "Space Hogs"},
 	"services":  {"Launch Agents", "Remote Desktop"},
 	"security":  {"Security"},
 	"infra":     {"Dynamic Library Health", "Homebrew"},

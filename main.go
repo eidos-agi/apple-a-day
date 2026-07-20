@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/eidos-agi/apple-a-day/internal/aad"
 )
@@ -22,6 +23,8 @@ func main() {
 		pluginsCmd(os.Args[2:])
 	case "score":
 		scoreCmd(os.Args[2:])
+	case "serve":
+		serveCmd(os.Args[2:])
 	case "-h", "--help", "help":
 		usage()
 	default:
@@ -83,6 +86,19 @@ func scoreCmd(args []string) {
 	fmt.Println(aad.ScoreJSONFromReport(rep))
 }
 
+// serveCmd runs the aad daemon (HTTP status API, like resource-sentinel).
+func serveCmd(args []string) {
+	fs := flag.NewFlagSet("serve", flag.ExitOnError)
+	addr := fs.String("addr", "127.0.0.1:9342", "listen address")
+	interval := fs.Duration("interval", 5*time.Minute, "checkup refresh interval")
+	fs.Parse(args)
+	fmt.Fprintf(os.Stderr, "aad serve on %s (refresh %s)\n", *addr, *interval)
+	if err := aad.RunServer(*addr, *interval); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
 func pluginsCmd(args []string) {
 	fs := flag.NewFlagSet("plugins", flag.ExitOnError)
 	asJSON := fs.Bool("json", false, "output as JSON")
@@ -98,5 +114,6 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage:")
 	fmt.Fprintln(os.Stderr, "  aad checkup [--json] [--no-parallel] [-c name,name]")
 	fmt.Fprintln(os.Stderr, "  aad score [--json]")
+	fmt.Fprintln(os.Stderr, "  aad serve [--addr host:port] [--interval dur]")
 	fmt.Fprintln(os.Stderr, "  aad plugins [--json]")
 }
