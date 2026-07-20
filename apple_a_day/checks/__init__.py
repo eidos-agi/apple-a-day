@@ -17,6 +17,7 @@ from .thermal import check_thermal
 from .network import check_network, check_network_speed
 from .remote_desktop import check_remote_desktop
 from .tailscale import check_tailscale
+from .resource_sentinel import check_resource_sentinel
 
 FAST_CHECKS = [
     check_cpu_load,
@@ -44,6 +45,7 @@ ALL_CHECKS = [
     check_agent_sprawl,
     check_remote_desktop,
     check_tailscale,
+    check_resource_sentinel,
 ]
 
 # Opt-in checks — not in ALL_CHECKS, available via `aad checkup -c <name>`

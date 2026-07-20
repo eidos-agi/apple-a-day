@@ -82,6 +82,38 @@ apple-a-day is more than a one-shot diagnostic:
 | **Browser extension** | Chrome extension tracking tab lifecycle, open tab count, stale tabs |
 | **User profiling** | Detects developer type, installed tools, workspace shape — tailors findings accordingly |
 
+## Plugins
+
+apple-a-day stays read-only — it *finds*, it never mutates. Anything that **acts**
+on the machine, runs **always-on**, or needs a **minutes-deep scan** lives in its
+own tool and is folded in as a *plugin*: a check that wraps that external tool and
+surfaces its state. (Plugins are compiled in — this is a catalog + health probe,
+not a runtime loader.) Run `aad plugins` to see the catalog with live health.
+
+**Active**
+
+| Plugin | Kind | Scope | Wraps | What |
+|--------|------|-------|-------|------|
+| **Resource Sentinel** | actuator | node | `resource-sentinel` | Real-time disk/RAM/CPU guardian: safe-cleans rebuildable caches, SIGSTOPs runaway writers |
+| **Space Hogs** | analyst | node | `space-hog` | On-demand deep space audit (caches/Docker/Ollama/downloads) via `space-hog --json` |
+
+**Proposed** (ranked — the same actuator/analyst shape at the next-riskiest domain for a headless, always-on, fleet-critical Mac):
+
+| # | Plugin | Kind | Scope | Why |
+|---|--------|------|-------|-----|
+| 1 | **Conduit** | actuator | fleet | Fleet nervous system — ensures every server is online & accessible; aad manages the local agent and reports health up, conduit covers aad's own-death blind spot |
+| 2 | **Boot Guardian** | actuator | node | Unattended reboot recovery: FileVault pre-boot unlock, autologin, Tailscale-at-boot, dead-man if it doesn't rejoin |
+| 3 | **Backup Guardian** | actuator | node | Watches Time Machine + offsite freshness, kicks a run when stale, periodic test-restore |
+| 4 | **Secrets Analyst** | analyst | node | Credential hygiene: keys in dotfiles/git history, stale SSH, key age, Keeper health |
+| 5 | **Intrusion Sentinel** | actuator | node | Real-time watch on new listening ports, launch items, authorized_keys |
+| 6 | **Update Guardian** | actuator | node | Staged macOS/brew/toolchain updates with pre-update snapshots |
+| 7 | **Restore Analyst** | analyst | node | Proves backups actually restore: coverage map, restore-time estimates |
+
+```bash
+aad plugins          # catalog + live health of active plugins
+aad plugins --json   # machine-readable
+```
+
 ## For AI Agents
 
 ```python
