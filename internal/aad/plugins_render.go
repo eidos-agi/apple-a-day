@@ -12,14 +12,15 @@ func RenderPlugins() string {
 	var b strings.Builder
 	b.WriteString("\naad plugins — external tools aad wraps (read-only)\n")
 
+	all := Plugins()
 	writeGroup := func(title string, status PluginStatus, probe bool) {
 		fmt.Fprintf(&b, "\n%s\n", title)
-		for _, p := range plugins {
+		for _, p := range all {
 			if p.Status != status {
 				continue
 			}
 			mark := "·"
-			detail := p.Install
+			detail := p.Repo
 			if probe && p.Health != nil {
 				if ok, d := p.Health(); ok {
 					mark, detail = "✓", d
@@ -50,8 +51,9 @@ func RenderPluginsJSON() string {
 		HealthOK   *bool  `json:"health_ok,omitempty"`
 		HealthNote string `json:"health_note,omitempty"`
 	}
-	out := make([]jp, 0, len(plugins))
-	for _, p := range plugins {
+	all := Plugins()
+	out := make([]jp, 0, len(all))
+	for _, p := range all {
 		row := jp{p.Name, p.Kind, p.Scope, string(p.Status), p.Tool, p.Repo, p.Summary, nil, ""}
 		if p.Health != nil {
 			ok, note := p.Health()
