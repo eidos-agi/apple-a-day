@@ -1,0 +1,8 @@
+{
+  "name": "Space Hogs",
+  "kind": "analyst",
+  "scope": "node",
+  "repo": "eidos-agi/space-hog",
+  "summary": "On-demand deep space audit: caches/Docker/Ollama/downloads reclaim taxonomy via `space-hog --json`.",
+  "health": { "command": "which space-hog >/dev/null && echo '{\"ok\":true,\"detail\":\"installed\"}' || echo '{\"ok\":false,\"detail\":\"not on PATH\"}'" }
+}
