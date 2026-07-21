@@ -49,6 +49,7 @@ func checkAgentSprawl() CheckResult {
 	}
 
 	mcpByScript := map[string][]int{}
+	mcpCertain := map[string]bool{}
 	var scriptOrder []string
 	var claudePPIDs []int
 	electronCounts := map[string]int{}
@@ -67,15 +68,12 @@ func checkAgentSprawl() CheckResult {
 			continue
 		}
 
-		for _, pat := range agentSprawlMCPPatterns {
-			if pat.MatchString(args) {
-				script := agentSprawlExtractScript(args)
-				if _, seen := mcpByScript[script]; !seen {
-					scriptOrder = append(scriptOrder, script)
-				}
-				mcpByScript[script] = append(mcpByScript[script], pid)
-				break
+		if script, certain, isServer := agentSprawlClassify(args); isServer {
+			if _, seen := mcpByScript[script]; !seen {
+				scriptOrder = append(scriptOrder, script)
 			}
+			mcpByScript[script] = append(mcpByScript[script], pid)
+			mcpCertain[script] = mcpCertain[script] || certain
 		}
 
 		if strings.Contains(args, "claude") && strings.Contains(" "+args+" ", " -p ") {
@@ -89,12 +87,15 @@ func checkAgentSprawl() CheckResult {
 		}
 	}
 
-	// dupes: scripts with more than 2 processes, in first-seen order (mirrors
-	// Python's dict comprehension over mcp_by_script.items()).
+	// dupes: scripts with more than 2 processes, in first-seen order.
+	// Generic (non-mcp-marked) server.py groups only count when duplicated —
+	// a single normal server.py app is not sprawl and must not inflate totals.
 	var dupeScripts []string
 	totalMCP := 0
 	for _, s := range scriptOrder {
-		totalMCP += len(mcpByScript[s])
+		if mcpCertain[s] || len(mcpByScript[s]) > 2 {
+			totalMCP += len(mcpByScript[s])
+		}
 		if len(mcpByScript[s]) > 2 {
 			dupeScripts = append(dupeScripts, s)
 		}
@@ -272,13 +273,52 @@ func agentSprawlSplit3(line string) (pid, comm, args string, ok bool) {
 	return pid, comm, args, true
 }
 
-// agentSprawlExtractScript mirrors Python's _extract_mcp_script.
+// agentSprawlClassify decides whether a ps args line is an agent/MCP server.
+// certain=true for anything with an mcp marker in the path; certain=false for
+// generic */server.py processes, which only count when duplicated (the fleet
+// runs MCP servers with no "mcp" in the path — showme/server.py,
+// aic-m-files/server.py — but a lone webapp server.py must not match).
+func agentSprawlClassify(args string) (script string, certain bool, isServer bool) {
+	lower := strings.ToLower(args)
+	for _, pat := range agentSprawlMCPPatterns {
+		if pat.MatchString(args) {
+			return agentSprawlExtractScript(args), true, true
+		}
+	}
+	for _, seg := range []string{"mcp-server", "mcp-servers", "mcp_servers", "/mcp/"} {
+		if strings.Contains(lower, seg) {
+			return agentSprawlExtractScript(args), true, true
+		}
+	}
+	if tok := agentSprawlServerPyToken(args); tok != "" {
+		return tok, strings.Contains(lower, "mcp"), true
+	}
+	return "", false, false
+}
+
+// agentSprawlServerPyToken returns the first */server.py path token, if any.
+func agentSprawlServerPyToken(args string) string {
+	for _, t := range strings.Fields(args) {
+		if strings.HasSuffix(t, "/server.py") {
+			return t
+		}
+	}
+	return ""
+}
+
+// agentSprawlExtractScript picks the best script token from a ps args line:
+// a path-like *.py token first, then anything with an mcp marker, then the
+// legacy py: reference, then a truncated arg string.
 func agentSprawlExtractScript(args string) string {
 	for _, token := range strings.Fields(args) {
-		if strings.Contains(token, "mcp_server") && (strings.HasSuffix(token, ".py") || strings.Contains(token, "/mcp")) {
+		lt := strings.ToLower(token)
+		if strings.HasSuffix(lt, ".py") && strings.Contains(token, "/") {
 			return token
 		}
-		if strings.HasSuffix(token, "mcp_server.py") {
+	}
+	for _, token := range strings.Fields(args) {
+		lt := strings.ToLower(token)
+		if strings.Contains(lt, "mcp_server") || strings.Contains(lt, "mcp-server") || strings.Contains(token, "/mcp") {
 			return token
 		}
 	}

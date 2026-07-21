@@ -88,11 +88,14 @@ func checkSpaceHogs() CheckResult {
 		})
 		return r
 	}
-	out := runT(4*time.Minute, "space-hog", "--json")
+	// 90s cap (was 4m): space-hog's deep scan hangs for minutes on a
+	// pressured disk, and agents running checkup as preflight would block.
+	out := runT(90*time.Second, "space-hog", "--json")
 	if out == "" {
-		r.Errors = append(r.Errors, CheckError{
-			Check: "space_hogs", ErrorCode: "UNKNOWN_ERROR",
-			Message: "space-hog --json produced no output (scan may have timed out)",
+		r.add(Finding{
+			Check: "space_hogs", Severity: INFO,
+			Summary: "space-hog scan timed out (90s cap) — skipped",
+			Fix:     "Use `aad reclaim-plan --json` for fast ranked reclaim candidates; run space-hog manually when the machine is idle.",
 		})
 		return r
 	}

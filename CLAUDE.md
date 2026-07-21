@@ -103,6 +103,16 @@ aad schema                     # JSON schema for agents
 aad profile                    # Mac user profile
 ```
 
+## Agent Preflight
+
+Before heavy local work (parallel MCP fan-out, docker builds, large writes):
+
+1. `aad checkup --json` — storage or memory dimension at 0 means stop and reclaim first.
+2. `aad reclaim-plan --json` — ranked reclaim candidates with sizes and risk; `low_risk_total_gb` is the safe-approval math. Every command requires human approval.
+3. **Never run full-home scans** (`du -xh -d1 ~`, unbounded `find`) — they hang for minutes under disk pressure. reclaim-plan's probes are capped.
+4. Don't block preflight on space-hog — it's opt-in and capped at 90s inside checkup.
+5. Agent harnesses often deny `rm`/`docker prune` even after human approval — run approved deletes in a human shell (`!` prefix in Claude Code) or a session with delete grants.
+
 ## Hard Rules
 
 - **Zero runtime dependencies** — stdlib + macOS native tools only. Optional extras (rich, jinja2) are opt-in.

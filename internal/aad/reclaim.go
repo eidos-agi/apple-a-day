@@ -29,12 +29,34 @@ type ReclaimItem struct {
 
 // ReclaimPlan is the full agent-facing plan.
 type ReclaimPlan struct {
-	FreeGB     float64       `json:"free_gb"`
-	MinFreeGB  float64       `json:"min_free_gb"`
-	BelowFloor bool          `json:"below_floor"`
-	Items      []ReclaimItem `json:"items"`
-	Rules      []string      `json:"rules"`
-	Note       string        `json:"note"`
+	FreeGB         float64       `json:"free_gb"`
+	MinFreeGB      float64       `json:"min_free_gb"`
+	BelowFloor     bool          `json:"below_floor"`
+	LowRiskTotalGB float64       `json:"low_risk_total_gb"`
+	Items          []ReclaimItem `json:"items"`
+	Rules          []string      `json:"rules"`
+	Note           string        `json:"note"`
+}
+
+// reclaimPlanNote is the standing agent guidance — hard-won mission lessons:
+// agent harnesses routinely deny rm even after human approval, and full-home
+// du hangs for minutes on a pressured disk.
+const reclaimPlanNote = "aad is diagnose-only. Every command here requires human approval before an agent runs it. " +
+	"Work docs are never reclaim candidates. " +
+	"Agent harnesses often deny rm/docker-prune even after approval — run approved commands in a human shell " +
+	"(`!` prefix in Claude Code) or a session with delete grants. " +
+	"Do NOT run `du -xh -d1 ~` or other full-home scans — they hang for minutes under disk pressure; use this plan's capped probes instead."
+
+// lowRiskTotal sums the measured size of low-risk items — the safe-approval
+// math an agent needs for "how much do the easy rows buy us".
+func lowRiskTotal(items []ReclaimItem) float64 {
+	total := 0.0
+	for _, it := range items {
+		if it.EstGB > 0 && strings.HasPrefix(it.Risk, "low") {
+			total += it.EstGB
+		}
+	}
+	return round1(total)
 }
 
 // storageTiers is the subset of ~/.config/eidos/storage-tiers.json aad needs.
@@ -169,12 +191,13 @@ func BuildReclaimPlan() ReclaimPlan {
 	sort.SliceStable(items, func(i, j int) bool { return items[i].EstGB > items[j].EstGB })
 
 	return ReclaimPlan{
-		FreeGB:     round1(freeGB),
-		MinFreeGB:  minFree,
-		BelowFloor: freeGB >= 0 && freeGB < minFree,
-		Items:      items,
-		Rules:      rules,
-		Note:       "aad is diagnose-only. Every command here requires human approval before an agent runs it. Work docs are never reclaim candidates.",
+		FreeGB:         round1(freeGB),
+		MinFreeGB:      minFree,
+		BelowFloor:     freeGB >= 0 && freeGB < minFree,
+		LowRiskTotalGB: lowRiskTotal(items),
+		Items:          items,
+		Rules:          rules,
+		Note:           reclaimPlanNote,
 	}
 }
 
