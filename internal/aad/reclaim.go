@@ -121,9 +121,49 @@ func BuildReclaimPlan() ReclaimPlan {
 		freeGB = float64(free) / 1e9
 	}
 
-	// Disjoint paths only — no double counting (~/.cache listed whole, its
-	// subdirs called out in the command text instead of as separate rows).
-	candidates := []ReclaimItem{
+	candidates := reclaimCandidates(home)
+
+	items := candidates[:0]
+	for _, c := range candidates {
+		if _, err := os.Stat(c.Path); err != nil {
+			continue
+		}
+		c.EstGB = round1(duGB(c.Path))
+		// The allocated-vs-active delta is the real Docker reclaim signal:
+		// a 44 GB Docker.raw holding 9 GB of live data means ~35 GB back
+		// from prune + shrink, not 44.
+		if c.Item == "docker-vm-disk" && c.EstGB > 0 {
+			if used := dockerActiveGB(); used >= 0 {
+				c.Details = fmt.Sprintf("%.1f GB allocated, %.1f GB held by docker data (images+containers+volumes) — only ~%.0f GB is VM slack; bigger reclaim means deleting volumes/images after review", c.EstGB, used, c.EstGB-used)
+			}
+		}
+		items = append(items, c)
+	}
+
+	if snap := snapshotItem(); snap != nil {
+		items = append(items, *snap)
+	}
+
+	// Largest first; unsized (-1) last.
+	sort.SliceStable(items, func(i, j int) bool { return items[i].EstGB > items[j].EstGB })
+
+	return ReclaimPlan{
+		FreeGB:         round1(freeGB),
+		MinFreeGB:      minFree,
+		BelowFloor:     freeGB >= 0 && freeGB < minFree,
+		LowRiskTotalGB: lowRiskTotal(items),
+		Items:          items,
+		Rules:          rules,
+		Note:           reclaimPlanNote,
+	}
+}
+
+// reclaimCandidates is the watched-path list — shared by the reclaim plan and
+// the growth hotspot ledger so both track the same buckets.
+// Disjoint paths only — no double counting (~/.cache listed whole, its
+// subdirs called out in the command text instead of as separate rows).
+func reclaimCandidates(home string) []ReclaimItem {
+	return []ReclaimItem{
 		{
 			Item: "docker-vm-disk", Path: filepath.Join(home, "Library/Containers/com.docker.docker/Data/vms/0/data/Docker.raw"),
 			Risk: "medium — volumes may hold live data; review before prune", ApprovalNeeded: true,
@@ -164,40 +204,6 @@ func BuildReclaimPlan() ReclaimPlan {
 			Risk: "low — already discarded", ApprovalNeeded: true,
 			Command: "empty Trash from Finder",
 		},
-	}
-
-	items := candidates[:0]
-	for _, c := range candidates {
-		if _, err := os.Stat(c.Path); err != nil {
-			continue
-		}
-		c.EstGB = round1(duGB(c.Path))
-		// The allocated-vs-active delta is the real Docker reclaim signal:
-		// a 44 GB Docker.raw holding 9 GB of live data means ~35 GB back
-		// from prune + shrink, not 44.
-		if c.Item == "docker-vm-disk" && c.EstGB > 0 {
-			if used := dockerActiveGB(); used >= 0 {
-				c.Details = fmt.Sprintf("%.1f GB allocated, %.1f GB held by docker data (images+containers+volumes) — only ~%.0f GB is VM slack; bigger reclaim means deleting volumes/images after review", c.EstGB, used, c.EstGB-used)
-			}
-		}
-		items = append(items, c)
-	}
-
-	if snap := snapshotItem(); snap != nil {
-		items = append(items, *snap)
-	}
-
-	// Largest first; unsized (-1) last.
-	sort.SliceStable(items, func(i, j int) bool { return items[i].EstGB > items[j].EstGB })
-
-	return ReclaimPlan{
-		FreeGB:         round1(freeGB),
-		MinFreeGB:      minFree,
-		BelowFloor:     freeGB >= 0 && freeGB < minFree,
-		LowRiskTotalGB: lowRiskTotal(items),
-		Items:          items,
-		Rules:          rules,
-		Note:           reclaimPlanNote,
 	}
 }
 

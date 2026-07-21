@@ -47,6 +47,16 @@ func RunServer(addr string, interval time.Duration) error {
 			s.refresh()
 		}
 	}()
+	// Hourly hotspot snapshot feeds `aad growth` path attribution — capped du
+	// over the watched reclaim paths, never a full-home scan.
+	go func() {
+		SampleHotspots()
+		t := time.NewTicker(time.Hour)
+		defer t.Stop()
+		for range t.C {
+			SampleHotspots()
+		}
+	}()
 
 	// warmed serves the cached report as JSON via f, or 503 if not ready yet.
 	warmed := func(f func(CheckupReport) string) http.HandlerFunc {

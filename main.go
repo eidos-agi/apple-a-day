@@ -25,6 +25,8 @@ func main() {
 		scoreCmd(os.Args[2:])
 	case "reclaim-plan":
 		fmt.Println(aad.RenderReclaimJSON())
+	case "growth":
+		growthCmd(os.Args[2:])
 	case "serve":
 		serveCmd(os.Args[2:])
 	case "version", "--version":
@@ -90,6 +92,20 @@ func scoreCmd(args []string) {
 	fmt.Println(aad.ScoreJSONFromReport(rep))
 }
 
+// growthCmd emits the fill-rate report; --sample first appends a hotspot
+// snapshot (capped du over the watched reclaim paths).
+func growthCmd(args []string) {
+	fs := flag.NewFlagSet("growth", flag.ExitOnError)
+	sample := fs.Bool("sample", false, "append a hotspot snapshot before reporting")
+	fs.Parse(args)
+	if *sample {
+		if _, err := aad.SampleHotspots(); err != nil {
+			fmt.Fprintln(os.Stderr, "hotspot sample:", err)
+		}
+	}
+	fmt.Println(aad.RenderGrowthJSON())
+}
+
 // serveCmd runs the aad daemon (HTTP status API, like resource-sentinel).
 func serveCmd(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
@@ -119,6 +135,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  aad checkup [--json] [--no-parallel] [-c name,name]")
 	fmt.Fprintln(os.Stderr, "  aad score [--json]")
 	fmt.Fprintln(os.Stderr, "  aad reclaim-plan   (always JSON; read-only, commands require human approval)")
+	fmt.Fprintln(os.Stderr, "  aad growth [--sample]   (always JSON; fill rate, ETA to floor, growing paths)")
 	fmt.Fprintln(os.Stderr, "  aad serve [--addr host:port] [--interval dur]")
 	fmt.Fprintln(os.Stderr, "  aad plugins [--json]")
 }

@@ -43,6 +43,7 @@ func checkDiskHealth() CheckResult {
 	r.add(Finding{
 		Check: "disk_health", Severity: sev,
 		Summary: summary,
+		Details: growthDiskFinding(freeGB, minFree),
 		Fix:     fix,
 	})
 	return r
