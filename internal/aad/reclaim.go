@@ -2,6 +2,7 @@ package aad
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -23,6 +24,7 @@ type ReclaimItem struct {
 	Risk           string  `json:"risk"`
 	ApprovalNeeded bool    `json:"approval_needed"`
 	Command        string  `json:"command"`
+	Details        string  `json:"details,omitempty"`
 }
 
 // ReclaimPlan is the full agent-facing plan.
@@ -148,6 +150,14 @@ func BuildReclaimPlan() ReclaimPlan {
 			continue
 		}
 		c.EstGB = round1(duGB(c.Path))
+		// The allocated-vs-active delta is the real Docker reclaim signal:
+		// a 44 GB Docker.raw holding 9 GB of live data means ~35 GB back
+		// from prune + shrink, not 44.
+		if c.Item == "docker-vm-disk" && c.EstGB > 0 {
+			if used := dockerActiveGB(); used >= 0 {
+				c.Details = fmt.Sprintf("%.1f GB allocated, %.1f GB held by docker data (images+containers+volumes) — only ~%.0f GB is VM slack; bigger reclaim means deleting volumes/images after review", c.EstGB, used, c.EstGB-used)
+			}
+		}
 		items = append(items, c)
 	}
 
@@ -203,6 +213,21 @@ func snapshotItem() *ReclaimItem {
 		Item: "tm-local-snapshots", EstGB: -1,
 		Risk: risk, ApprovalNeeded: true, Command: cmd,
 	}
+}
+
+// dockerActiveGB sums docker's own view of image+container+volume usage
+// (decimal GB), or -1 if docker is absent/hung. Compared against Docker.raw's
+// allocated blocks it exposes how much a prune + shrink would return.
+func dockerActiveGB() float64 {
+	out := runT(30*time.Second, "docker", "system", "df", "--format", "{{.Size}}")
+	if out == "" {
+		return -1
+	}
+	total := 0.0
+	for _, line := range strings.Split(out, "\n") {
+		total += dockerVolumesParseSizeGB(line)
+	}
+	return round1(total)
 }
 
 // diskUsage returns (total, free) bytes for the boot container via diskutil,
