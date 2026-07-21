@@ -149,7 +149,7 @@ func checkAgentSprawl() CheckResult {
 			Summary: fmt.Sprintf("%d MCP server processes — %d script(s) duplicated (worst: %d× %s)",
 				totalMCP, len(dupeScripts), len(worstPIDs), base),
 			Details: strings.Join(detailLines, "\n"),
-			Fix:     "Kill duplicate MCP PIDs and restart your IDE/agent session. Each Cursor/Codex session should spawn one MCP server per tool, not dozens.",
+			Fix:     sprawlDedupeFix(sortedScripts, mcpByScript),
 		})
 	} else if totalMCP > 8 {
 		r.add(Finding{
@@ -208,6 +208,46 @@ func checkAgentSprawl() CheckResult {
 	}
 
 	return r
+}
+
+// sprawlKillPlan splits a dupe script's PIDs into (keep, kill-candidates):
+// keep the highest PID — almost always the newest process, i.e. the one bound
+// to the live session — and mark the rest for review. ponytail: PID order is a
+// heuristic (PIDs wrap); the fix text tells the operator to verify with ps
+// before killing, and aad never kills anything itself.
+func sprawlKillPlan(pids []int) (keep int, kill []int) {
+	if len(pids) == 0 {
+		return 0, nil
+	}
+	kill = append([]int(nil), pids...)
+	sort.Ints(kill)
+	keep = kill[len(kill)-1]
+	return keep, kill[:len(kill)-1]
+}
+
+// sprawlDedupeFix renders a per-script safe-dedupe plan for the operator.
+// Explicitly advisory: verify orphans (PPID 1 = parent session died) first,
+// never kill a PID attached to a live boss/worker session.
+func sprawlDedupeFix(scripts []string, mcpByScript map[string][]int) string {
+	var b strings.Builder
+	b.WriteString("Safe dedupe (advisory — requires human approval, never auto-kill):\n")
+	for _, s := range scripts {
+		keep, kill := sprawlKillPlan(mcpByScript[s])
+		if len(kill) == 0 {
+			continue
+		}
+		base := s
+		if i := strings.LastIndex(base, "/"); i >= 0 {
+			base = base[i+1:]
+		}
+		killStrs := make([]string, 0, len(kill))
+		for _, p := range kill {
+			killStrs = append(killStrs, strconv.Itoa(p))
+		}
+		fmt.Fprintf(&b, "  %s: keep %d (newest), review-then-kill %s\n", base, keep, strings.Join(killStrs, ", "))
+	}
+	b.WriteString("Verify before killing: `ps -o pid,ppid,lstart,command -p <PIDs>` — PPID 1 means orphaned (parent session died); a live PPID means an active session, leave it. Then restart the IDE/agent session so each tool spawns one server.")
+	return b.String()
 }
 
 // agentSprawlSplit3 mirrors Python's `line.split(None, 2)`: at most 3
