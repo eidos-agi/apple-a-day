@@ -96,13 +96,8 @@ func checkDockerVolumes() CheckResult {
 			}
 		}
 
-		// ponytail: disk_relief_guidance() (apple_a_day/storage.py) reads storage-tier
-		// config (M-Files role, cold-tier machine/path) to build profile-aware cleanup
-		// guidance. Storage/context wiring is out of scope for this port — using a
-		// fixed default message instead. Deferred.
-		fix := "Delete locally (don't move): caches, APFS snapshots, stale Docker images. " +
-			"Cold offload → mac-mini-01:MacMiniStorage. " +
-			"`docker system df -v` before prune — export inactive volumes to cold tier if needed."
+		fix := storageGuardrail() +
+			" `docker system df -v` before prune — export inactive volumes to cold tier if needed."
 		if len(orphans) > 0 {
 			n := len(orphans)
 			if n > 3 {

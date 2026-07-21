@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -50,6 +51,15 @@ func TestDiskSeverity(t *testing.T) {
 		if got := diskSeverity(c.free, c.usedPct, 50); got != c.want {
 			t.Errorf("diskSeverity(%v, %d): got %v want %v", c.free, c.usedPct, got, c.want)
 		}
+	}
+}
+
+func TestGuardrailText(t *testing.T) {
+	if got := guardrailText([]string{"Rule one.", "Rule two."}); !strings.Contains(got, "Rule one. Rule two.") || !strings.Contains(got, "reclaim-plan") {
+		t.Errorf("configured rules not rendered: %q", got)
+	}
+	if got := guardrailText(nil); !strings.Contains(got, "M-Files") || !strings.Contains(got, "reclaim-plan") {
+		t.Errorf("fallback guardrail wrong: %q", got)
 	}
 }
 

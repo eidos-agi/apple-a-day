@@ -35,14 +35,6 @@ var cleanupSafeApps = map[string]bool{
 	"TV": true, "Books": true, "Voice Memos": true, "QuickTime Player": true,
 }
 
-// ponytail: storage.py's storage_guardrail() (fleet storage-tier config at
-// ~/.config/eidos/storage-tiers.json, "..storage" system) is not ported yet —
-// this check uses a fixed guardrail string matching the Python default output.
-// Upgrade to the real tier-aware guidance once storage.py is ported to Go.
-const cleanupGuardrail = "STORAGE RULE: work docs → M-Files (aic-m-files), never delete to free disk. " +
-	"Caches/Docker → delete locally. Archives → MacMiniStorage only. " +
-	"Run `aad reclaim-plan --json` before bulk deletes."
-
 // cleanupApp is one stale-app scoring candidate. Mirrors the Python scored dict.
 type cleanupApp struct {
 	name     string
@@ -119,7 +111,7 @@ func checkCleanup() CheckResult {
 				Summary:  fmt.Sprintf("%d app(s) not used in 90+ days: %s%s", len(strong), strings.Join(shown, ", "), ellipsis),
 				Details:  details.String(),
 				Fix: "Review and uninstall unused apps. Drag to Trash or use " +
-					"`sudo rm -rf /Applications/<App>.app`. " + cleanupGuardrail,
+					"`sudo rm -rf /Applications/<App>.app`. " + storageGuardrail(),
 			})
 		}
 

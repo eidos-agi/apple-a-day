@@ -254,6 +254,24 @@ func round1(v float64) float64 {
 	return float64(int(v*10+0.5)) / 10
 }
 
+// storageGuardrail renders the machine's configured storage-tier rules for
+// check fix text, so guidance tracks ~/.config/eidos/storage-tiers.json
+// instead of a hardcoded copy that drifts. Falls back to the fixed default
+// on unconfigured machines.
+func storageGuardrail() string {
+	_, rules := loadStorageTiers(defaultTiersPath())
+	return guardrailText(rules)
+}
+
+func guardrailText(rules []string) string {
+	const tail = " Run `aad reclaim-plan --json` before bulk deletes."
+	if len(rules) == 0 {
+		return "STORAGE RULE: work docs → M-Files (aic-m-files), never delete to free disk. " +
+			"Caches/Docker → delete locally. Archives → MacMiniStorage only." + tail
+	}
+	return "STORAGE RULES: " + strings.Join(rules, " ") + tail
+}
+
 // RenderReclaimJSON is the CLI entrypoint payload.
 func RenderReclaimJSON() string {
 	b, _ := json.MarshalIndent(BuildReclaimPlan(), "", "  ")
