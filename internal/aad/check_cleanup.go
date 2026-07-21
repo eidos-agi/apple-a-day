@@ -41,7 +41,7 @@ var cleanupSafeApps = map[string]bool{
 // Upgrade to the real tier-aware guidance once storage.py is ported to Go.
 const cleanupGuardrail = "STORAGE RULE: work docs → M-Files (aic-m-files), never delete to free disk. " +
 	"Caches/Docker → delete locally. Archives → MacMiniStorage only. " +
-	"Run `aad storage` before bulk deletes."
+	"Run `aad reclaim-plan --json` before bulk deletes."
 
 // cleanupApp is one stale-app scoring candidate. Mirrors the Python scored dict.
 type cleanupApp struct {

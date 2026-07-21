@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// ponytail: profile-aware refinements (developer 50GB floor, m_files tiers,
-// snapshot relief guidance) deferred — core free-space verdict ported first.
 func init() {
 	register(Check{Name: "Disk Health", Run: checkDiskHealth})
 }
@@ -16,57 +14,57 @@ func checkDiskHealth() CheckResult {
 	r := CheckResult{Name: "Disk Health"}
 
 	// diskutil reports real APFS container usage — df lies about free space.
-	out := run("diskutil", "info", "/")
-	if out == "" {
-		r.Errors = append(r.Errors, CheckError{
-			Check: "disk_health", ErrorCode: "TOOL_NOT_FOUND",
-			Message: "diskutil info / returned nothing",
-		})
-		return r
-	}
-
-	info := map[string]string{}
-	for _, line := range strings.Split(out, "\n") {
-		if k, v, ok := strings.Cut(line, ":"); ok {
-			info[strings.TrimSpace(k)] = strings.TrimSpace(v)
-		}
-	}
-
-	diskBytes := parseBytesField(info["Disk Size"])
-	freeBytes := parseBytesField(info["Container Free Space"])
+	diskBytes, freeBytes := diskUsage()
 	if diskBytes == 0 || freeBytes == 0 {
 		r.Errors = append(r.Errors, CheckError{
 			Check: "disk_health", ErrorCode: "PARSE_ERROR",
-			Message: "could not parse disk size / free space",
+			Message: "could not parse diskutil disk size / free space",
 		})
 		return r
 	}
 
 	usedPct := int((1 - float64(freeBytes)/float64(diskBytes)) * 100)
 	freeGB := float64(freeBytes) / 1e9
+	minFree, _ := loadStorageTiers(defaultTiersPath())
 
-	sev := OK
-	switch {
-	case freeGB < 10:
-		sev = CRITICAL
-	case freeGB < 30:
-		sev = WARNING
-	case usedPct >= 95:
-		sev = CRITICAL
-	case usedPct >= 85:
-		sev = WARNING
+	sev := diskSeverity(freeGB, usedPct, minFree)
+
+	summary := fmt.Sprintf("Boot disk %d%% full — %.1f GB free", usedPct, freeGB)
+	if freeGB < minFree {
+		summary += fmt.Sprintf(" (below %.0f GB floor)", minFree)
 	}
-
 	fix := ""
 	if sev != OK {
-		fix = "Run `sudo tmutil thinlocalsnapshots / 9999999999 1` to reclaim snapshot space."
+		// ponytail: snapshot-thinning was the old one-size-fits-all fix; it
+		// reclaims ~nothing when only OS-update snapshots exist. Point agents
+		// at the ranked plan instead.
+		fix = "Run `aad reclaim-plan --json` for ranked reclaim candidates (all require human approval)."
 	}
 	r.add(Finding{
 		Check: "disk_health", Severity: sev,
-		Summary: fmt.Sprintf("Boot disk %d%% full — %.1f GB free", usedPct, freeGB),
+		Summary: summary,
 		Fix:     fix,
 	})
 	return r
+}
+
+// diskSeverity grades free space against the configured hot-tier floor
+// (storage-tiers.json min_free_gb, default 50). A near-full disk close to the
+// floor is CRITICAL even when the floor itself is not yet breached — agents
+// need the stop signal before the floor is blown, not after.
+func diskSeverity(freeGB float64, usedPct int, minFreeGB float64) Severity {
+	switch {
+	case freeGB < 10 || usedPct >= 95:
+		return CRITICAL
+	case freeGB < minFreeGB:
+		return CRITICAL
+	case usedPct >= 90 && freeGB < 1.5*minFreeGB:
+		return CRITICAL
+	case freeGB < 1.5*minFreeGB || usedPct >= 85:
+		return WARNING
+	default:
+		return OK
+	}
 }
 
 // parseBytesField extracts the byte count from a diskutil field like

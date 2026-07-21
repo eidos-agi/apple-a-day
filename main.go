@@ -23,6 +23,8 @@ func main() {
 		pluginsCmd(os.Args[2:])
 	case "score":
 		scoreCmd(os.Args[2:])
+	case "reclaim-plan":
+		fmt.Println(aad.RenderReclaimJSON())
 	case "serve":
 		serveCmd(os.Args[2:])
 	case "version", "--version":
@@ -116,6 +118,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "usage:")
 	fmt.Fprintln(os.Stderr, "  aad checkup [--json] [--no-parallel] [-c name,name]")
 	fmt.Fprintln(os.Stderr, "  aad score [--json]")
+	fmt.Fprintln(os.Stderr, "  aad reclaim-plan   (always JSON; read-only, commands require human approval)")
 	fmt.Fprintln(os.Stderr, "  aad serve [--addr host:port] [--interval dur]")
 	fmt.Fprintln(os.Stderr, "  aad plugins [--json]")
 }
