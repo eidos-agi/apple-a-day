@@ -246,7 +246,7 @@ func sprawlDedupeFix(scripts []string, mcpByScript map[string][]int) string {
 		}
 		fmt.Fprintf(&b, "  %s: keep %d (newest), review-then-kill %s\n", base, keep, strings.Join(killStrs, ", "))
 	}
-	b.WriteString("Verify before killing: `ps -o pid,ppid,lstart,command -p <PIDs>` — PPID 1 means orphaned (parent session died); a live PPID means an active session, leave it. Then restart the IDE/agent session so each tool spawns one server.")
+	b.WriteString("Verify before killing: `ps -o pid,ppid,lstart,command -p <PIDs>` — PPID 1 means orphaned (parent session died); a live PPID means an active session, leave the child alone. If most parents are live agent CLIs (grok/codex/claude), the fix is closing idle sessions — each spawns a full MCP set, and killing children while parents live just respawns them.")
 	return b.String()
 }
 
