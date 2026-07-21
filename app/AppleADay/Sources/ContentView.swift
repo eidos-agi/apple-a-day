@@ -192,14 +192,64 @@ struct HealthPanelView: View {
                     VitalsView(samples: healthService.recentVitals)
                 }
 
+                // Installed Plugins
+                if !healthService.plugins.isEmpty {
+                    PluginsView(plugins: healthService.plugins)
+                }
+
                 Divider()
 
                 // Quick Actions
                 QuickActionsView()
                     .environmentObject(healthService)
+
+                // Version footer — proof of exactly which build is running
+                if let v = healthService.appVersion {
+                    Text("aad \(v.version) · \(v.shortCommit) · \(healthService.plugins.filter { $0.isActive }.count) plugins active")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
             }
             .padding(12)
         }
+    }
+}
+
+// MARK: - Plugins
+
+private struct PluginsView: View {
+    let plugins: [PluginInfo]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("PLUGINS")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.secondary)
+            ForEach(plugins.filter { $0.isActive }) { p in
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(p.isInstalled ? Color.green : Color.red)
+                        .frame(width: 7, height: 7)
+                    Text(p.name)
+                        .font(.system(size: 11))
+                    Spacer()
+                    Text(p.kind)
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                    Text(p.isInstalled ? "installed" : "down")
+                        .font(.system(size: 9))
+                        .foregroundColor(p.isInstalled ? .green : .red)
+                }
+            }
+            let proposed = plugins.filter { !$0.isActive }.count
+            if proposed > 0 {
+                Text("+ \(proposed) proposed")
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

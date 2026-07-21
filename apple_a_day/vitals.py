@@ -186,6 +186,19 @@ def sample() -> dict:
     except (subprocess.TimeoutExpired, OSError, ValueError, IndexError):
         pass
 
+    # Free disk space — statvfs is a syscall (microseconds), so every tick is
+    # fine. Feeds `aad growth` fill-rate learning: without free_gb in the
+    # series, months of vitals can't answer "how fast is free falling?".
+    try:
+        st = os.statvfs("/System/Volumes/Data")
+        total = st.f_blocks * st.f_frsize
+        avail = st.f_bavail * st.f_frsize
+        s["free_gb"] = round(avail / 1e9, 2)
+        if total:
+            s["disk_used_pct"] = round((1 - avail / total) * 100, 1)
+    except OSError:
+        pass
+
     return s
 
 

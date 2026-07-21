@@ -76,6 +76,35 @@ struct SeverityCounts: Codable {
     let ok: Int
 }
 
+// MARK: - Version (aad serve /version)
+
+struct VersionInfo: Codable {
+    let version: String
+    let commit: String
+    let date: String
+    var shortCommit: String { String(commit.prefix(7)) }
+}
+
+// MARK: - Plugin (aad serve /plugins)
+
+struct PluginInfo: Codable, Identifiable {
+    let name: String
+    let kind: String
+    let scope: String
+    let status: String
+    let tool: String
+    let healthOK: Bool?
+
+    var id: String { name }
+    var isActive: Bool { status == "active" }
+    var isInstalled: Bool { healthOK ?? false }
+
+    enum CodingKeys: String, CodingKey {
+        case name, kind, scope, status, tool
+        case healthOK = "health_ok"
+    }
+}
+
 // MARK: - Vitals Sample (vitals.ndjson)
 
 struct VitalsSample: Codable {

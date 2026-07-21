@@ -1,0 +1,9 @@
+{
+  "name": "Resource Sentinel",
+  "kind": "actuator",
+  "scope": "node",
+  "repo": "eidos-agi/resource-sentinel",
+  "summary": "Real-time disk/RAM/CPU guardian: safe-cleans rebuildable caches, SIGSTOPs runaway writers.",
+  "liveness": { "launchd": "com.eidos.resource-sentinel" },
+  "health": { "url": "http://127.0.0.1:9341/status" }
+}

@@ -14,6 +14,8 @@ class HealthService: ObservableObject {
     @Published var isGeneratingReport = false
     @Published var pastReports: [ReportEntry] = []
     @Published var cliPath: String?
+    @Published var appVersion: VersionInfo?
+    @Published var plugins: [PluginInfo] = []
 
     private let logDir: String = {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
@@ -44,6 +46,8 @@ class HealthService: ObservableObject {
 
     private func findCli() -> String? {
         let candidates = [
+            // Prefer the Go binary (the rewrite); fall back to the Python shim.
+            "\(FileManager.default.homeDirectoryForCurrentUser.path)/.local/bin/aad",
             "\(FileManager.default.homeDirectoryForCurrentUser.path)/.pyenv/shims/aad",
             "/usr/local/bin/aad",
             "/opt/homebrew/bin/aad",
@@ -68,6 +72,8 @@ class HealthService: ObservableObject {
         loadLastCheckup()
         loadRecentVitals()
         loadScore()
+        loadVersion()
+        loadPlugins()
         checkDaemons()
         loadPastReports()
 
@@ -117,18 +123,24 @@ class HealthService: ObservableObject {
     }
 
     private func loadScore() {
-        guard let path = cliPath else { return }
         Task {
-            let result = shell(path, "score", "--json")
-            if result.status == 0, let data = result.output.data(using: .utf8) {
-                do {
-                    let parsed = try JSONDecoder().decode(ScoreOutput.self, from: data)
-                    score = parsed
-                    overallGrade = parsed.worstGrade
-                    Self.log("Score loaded: \(parsed.grade.letter), worst=\(parsed.worstGrade.letter)")
-                } catch {
-                    Self.log("Failed to parse score: \(error)")
-                }
+            // Thin client: read the aad daemon; fall back to spawning the CLI.
+            var json = await daemonGet("/score")
+            if json == nil, let path = cliPath {
+                let result = shell(path, "score", "--json")
+                if result.status == 0 { json = result.output }
+            }
+            guard let json, let data = json.data(using: .utf8) else {
+                Self.log("Score unavailable (daemon down, no CLI)")
+                return
+            }
+            do {
+                let parsed = try JSONDecoder().decode(ScoreOutput.self, from: data)
+                score = parsed
+                overallGrade = parsed.worstGrade
+                Self.log("Score loaded: \(parsed.grade.letter), worst=\(parsed.worstGrade.letter)")
+            } catch {
+                Self.log("Failed to parse score: \(error)")
             }
         }
     }
@@ -148,14 +160,26 @@ class HealthService: ObservableObject {
     // MARK: - Actions
 
     func runCheckup() {
-        guard let path = cliPath else { return }
         isRunningCheckup = true
         Self.log("Running checkup...")
         Task {
+            // With the daemon up, a checkup is just a re-read of its cache
+            // (it refreshes on its own timer) — no slow process spawn.
+            if await daemonGet("/health") != nil {
+                isRunningCheckup = false
+                Self.log("Checkup refreshed from daemon")
+                loadData()
+                return
+            }
+            guard let path = cliPath else {
+                isRunningCheckup = false
+                appState = .error("aad daemon down and CLI not found")
+                return
+            }
             let result = shell(path, "checkup", "--json")
             isRunningCheckup = false
             if result.status == 0 {
-                Self.log("Checkup completed")
+                Self.log("Checkup completed (CLI fallback)")
                 loadData()
             } else {
                 Self.log("Checkup failed: \(result.output)")
@@ -211,6 +235,44 @@ class HealthService: ObservableObject {
                 )
             }
         Self.log("Found \(pastReports.count) past reports")
+    }
+
+    // MARK: - Version + Plugins (from the daemon — proof of what's running)
+
+    private func loadVersion() {
+        Task {
+            guard let json = await daemonGet("/version"),
+                  let data = json.data(using: .utf8),
+                  let v = try? JSONDecoder().decode(VersionInfo.self, from: data) else { return }
+            appVersion = v
+            Self.log("Version: \(v.version) \(v.shortCommit)")
+        }
+    }
+
+    private func loadPlugins() {
+        Task {
+            guard let json = await daemonGet("/plugins"),
+                  let data = json.data(using: .utf8),
+                  let list = try? JSONDecoder().decode([PluginInfo].self, from: data) else { return }
+            plugins = list
+            Self.log("Plugins: \(list.filter { $0.isActive }.count) active")
+        }
+    }
+
+    // MARK: - Daemon Client (aad serve)
+
+    private let daemonBase = "http://127.0.0.1:9342"
+
+    /// GET a path from the aad daemon; nil on any failure (down, warming, timeout).
+    private func daemonGet(_ path: String) async -> String? {
+        guard let url = URL(string: daemonBase + path) else { return nil }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 3
+        guard let (data, resp) = try? await URLSession.shared.data(for: req),
+              let http = resp as? HTTPURLResponse, http.statusCode == 200 else {
+            return nil
+        }
+        return String(data: data, encoding: .utf8)
     }
 
     // MARK: - Shell Helper
