@@ -19,26 +19,21 @@ const swapCritMB = 4096.0
 func checkMemoryPressure() CheckResult {
 	r := CheckResult{Name: "Memory Pressure"}
 
-	// Pressure level.
-	if out := run("/usr/bin/memory_pressure", "-Q"); out != "" {
-		lower := strings.ToLower(out)
-		level, sev := "unknown", INFO
-		switch {
-		case strings.Contains(lower, "critical"):
-			level, sev = "CRITICAL", CRITICAL
-		case strings.Contains(lower, "warn"):
-			level, sev = "WARNING", WARNING
-		case strings.Contains(lower, "normal"):
-			level, sev = "normal", OK
-		}
+	// Pressure level. Modern macOS memory_pressure -Q prints only a free
+	// percentage (no normal/warn/critical token), which read as "unknown"
+	// forever — the memorystatus sysctl is authoritative (1/2/4); the string
+	// match stays as fallback for older output formats.
+	qOut := run("/usr/bin/memory_pressure", "-Q")
+	level, sev := pressureLevel(run("sysctl", "-n", "kern.memorystatus_vm_pressure_level"), qOut)
+	if qOut != "" || level != "unknown" {
 		fix := ""
-		if sev != OK {
+		if sev != OK && sev != INFO {
 			fix = "Close memory-heavy apps or check for leaks with `leaks <pid>`"
 		}
 		r.add(Finding{
 			Check: "memory_pressure", Severity: sev,
 			Summary: "Memory pressure: " + level,
-			Details: lastLine(out),
+			Details: lastLine(qOut),
 			Fix:     fix,
 		})
 	}
@@ -95,6 +90,30 @@ func checkMemoryPressure() CheckResult {
 	}
 
 	return r
+}
+
+// pressureLevel maps kern.memorystatus_vm_pressure_level (1 normal, 2 warning,
+// 4 critical) to a verdict, falling back to token-matching memory_pressure -Q
+// output when the sysctl is unavailable.
+func pressureLevel(sysctlVal, qOut string) (string, Severity) {
+	switch strings.TrimSpace(sysctlVal) {
+	case "1":
+		return "normal", OK
+	case "2":
+		return "WARNING", WARNING
+	case "4":
+		return "CRITICAL", CRITICAL
+	}
+	lower := strings.ToLower(qOut)
+	switch {
+	case strings.Contains(lower, "critical"):
+		return "CRITICAL", CRITICAL
+	case strings.Contains(lower, "warn"):
+		return "WARNING", WARNING
+	case strings.Contains(lower, "normal"):
+		return "normal", OK
+	}
+	return "unknown", INFO
 }
 
 func totalRAMGB() float64 {
